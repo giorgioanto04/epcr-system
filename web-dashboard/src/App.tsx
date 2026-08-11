@@ -1,134 +1,93 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
 import { io, Socket } from "socket.io-client";
+import "leaflet/dist/leaflet.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL;
+if (!API_URL) console.warn("VITE_API_URL non impostata: configura l'URL pubblico Render del backend.");
 
-type Mezzo = {
-  id: string; nome: string; targa?: string;
-  stato: "disponibile" | "impegnato" | "fuori_servizio";
-  lat: number | null; lon: number | null;
-};
-type EventoMissione = { id: string; stato: string; creato_il: string; dettagli?: any };
-type Intervento = {
-  id: string; numero_missione?: string; indirizzo: string; lat?: number|null; lon?: number|null;
-  tipologia?: string; note?: string; stato: string; stato_missione?: string; mezzo_id?: string|null;
-  creato_il: string; ora_assegnazione?: string|null; ora_presa_in_carico?: string|null;
-  ora_arrivo?: string|null; ora_rientro?: string|null; rifiuto_trasporto?: boolean;
-  scheda_missione?: Record<string, any>; registro?: EventoMissione[];
-};
+const statiMezzo = ["disponibile", "impegnato", "fuori_servizio"] as const;
+const statiMissione = ["Attivazione","Partenza","Arrivo sul posto","Paziente visto","Partenza per ospedale","Arrivo ospedale","Libero in Ospedale","Rientro","Disponibile"] as const;
+const colori: Record<string,string> = { verde:"#16a34a", giallo:"#eab308", rosso:"#dc2626" };
+const statoColor: Record<string,string> = { disponibile:"#16a34a", impegnato:"#f97316", fuori_servizio:"#64748b" };
 
-const STATI = ["Attivazione","Partenza","Arrivo sul posto","Paziente visto","Partenza per ospedale","Arrivo ospedale","Libero in Ospedale","Rientro","Disponibile"];
-const ETICHETTA: Record<string,string> = {
-  in_attesa:"In attesa",assegnato:"Assegnato",in_corso:"In corso",concluso:"Concluso",annullato:"Annullato"
-};
-const COLORE: Record<string,string> = {disponibile:"#15803d",impegnato:"#b91c1c",fuori_servizio:"#64748b"};
+type Mezzo = { id:string; nome:string; targa?:string; stato:string; lat:number|null; lon:number|null; flag_colore:string };
+type Intervento = { id:string; numero_missione:string; indirizzo:string; lat:number|null; lon:number|null; tipologia?:string; note?:string; priorita:string; stato:string; stato_operativo:string; creato_il:string; mezzo_id?:string; scheda_missione?:Record<string,unknown>; eventi?: any[]; mezzi?: Mezzo[] };
 
-const CAMPI: {section:string; fields:{key:string; label:string; type?:string; options?:string[]}[]}[] = [
- {section:"Identificazione",fields:[
-  {key:"denominazioneOdV",label:"Denominazione OdV"},{key:"targaCodMezzo",label:"Targa / cod. mezzo"},
-  {key:"kmIniziali",label:"Km iniziali",type:"number"},{key:"kmFinali",label:"Km finali",type:"number"},
-  {key:"matrAutista",label:"Matr. autista"},{key:"matrSoccorritore1",label:"Matr. soccorritore 1"},
-  {key:"matrSoccorritore2",label:"Matr. soccorritore 2"},{key:"convenzione",label:"Convenzione"},{key:"numeroInterno",label:"N° interno"}]},
- {section:"Luogo dell'evento",fields:[
-  {key:"luogoVia",label:"Via / piazza"},{key:"luogoCivico",label:"N. civico"},{key:"luogoPianoScala",label:"Piano / scala"},
-  {key:"luogoComune",label:"Comune"},{key:"dataEvento",label:"Data",type:"date"},
-  {key:"luogoEvento",label:"Tipologia luogo",options:["Casa","Strada","Uffici/esercizi pubblici","Impianto sportivo","Impianto lavorativo","Altro"]}]},
- {section:"Paziente",fields:[
-  {key:"cognome",label:"Cognome"},{key:"nome",label:"Nome"},{key:"dataNascita",label:"Data di nascita",type:"date"},
-  {key:"eta",label:"Età",type:"number"},{key:"cittadinanza",label:"Cittadinanza"},{key:"sesso",label:"Sesso",options:["M","F"]},
-  {key:"comuneResidenza",label:"Comune di residenza"},{key:"residenzaVia",label:"Via / piazza"},{key:"residenzaCivico",label:"N. civico"},
-  {key:"eventoRilevatoDa",label:"Evento rilevato da"},{key:"presenze",label:"Dati interni presenti",type:"multi",options:["OdV","MSA1","MSA2","CNSAS","VVF","CC","Polizia","Medico"]}]},
- {section:"Evento",fields:[
-  {key:"evento",label:"Evento",type:"multi",options:["Perdita di coscienza","Lesioni e aggravanti","Convulsioni","Malessere","Caduta","Incidente stradale","Avvelenamenti","Evento violento","Precipitato","Pedone/ciclo","Conducente moto","Malore","Travaglio/parto","Infortunio","Auto passeggero","Altro"]},
-  {key:"oraPerditaCoscienza",label:"Ora perdita coscienza",type:"time"},{key:"precipitatoDa",label:"Precipitato da (m)",type:"number"}]},
- {section:"Valutazione e parametri",fields:[
-  {key:"coscienza",label:"Stato coscienza",options:["Sveglio","Reagisce alla chiamata","Reagisce al dolore","Assente","Incosciente"]},
-  {key:"respiro",label:"Respiro",options:["Normale","Difficoltoso","Assente"]},
-  {key:"circolo",label:"Circolo",options:["Periferico","Centrale","Ritmico","Aritmico","Assente"]},
-  {key:"cute",label:"Cute",options:["Calda","Fredda","Rosea","Cianotica","Pallida","Sudata"]},
-  {key:"postura",label:"Postura",options:["In piedi","Seduta","Prona","Supina","Laterale"]},
-  {key:"cpss",label:"CPSS",options:["Deviazione rima labiale","Segni di lato","Alterazioni del linguaggio"]},{key:"cpssVal1",label:"CPSS valutazione 1"},{key:"cpssVal2",label:"CPSS valutazione 2"},{key:"cpssVal3",label:"CPSS valutazione 3"},
-  {key:"oraInsorgenzaSintomi",label:"Ora insorgenza sintomi",type:"time"},
-  {key:"fr",label:"FR",type:"number"},{key:"satAria",label:"Sat. aria %",type:"number"},{key:"satO2",label:"Sat. O2 %",type:"number"},
-  {key:"fc",label:"FC",type:"number"},{key:"pa",label:"PA"},{key:"temperatura",label:"Temp. °C",type:"number"},{key:"glicemia",label:"Glicemia",type:"number"},
-  {key:"noteValutazione",label:"Note valutazione",type:"textarea"}]},
- {section:"RCP / ACC",fields:[
-  {key:"inizioRcpOra",label:"Inizio RCP - ora",type:"time"},{key:"numeroShock",label:"Nr. shock",type:"number"},
-  {key:"roscOra",label:"ROSC - ora",type:"time"},{key:"esito",label:"Esito",options:["Trasporto con RCP","RCP già in corso","ACC durante il trasporto","Deceduto"]},
-  {key:"anamnesiAmpia",label:"Note / anamnesi AMPIA",type:"textarea"}]},
- {section:"Prestazioni / presidi",fields:[
-  {key:"prestazioni",label:"Prestazioni / presidi",type:"multi",options:["Ossigeno","Aspirazione cavo orale","Cannula OF ventilazione","RCP","Applicazione DAE","Trasmissione ECG","Rimozione casco","Estricazione collare cervicale","Barella cucchiaio","Tavola spinale","Sedia portantina","Materasso depressione","Estricatore","Steccobenda","Telo porta feriti","Fascia emostatica","Emostasi rapida","Medicazione ferite","Immobilizzazione arti","Immobilizzazione spinale","Protezione termica","Frattura esposta","Deformità","Sanguinamento","Emorragia massiva","Ferita","Ferita penetrante","Lacerazione/schiacciamento","Contusione","Ustione","Proiettato","Edema","Lesioni incompatibili con la vita","Accesso difficile","Presenza deceduti","Incastrato","Estricazione >20 min","Motilità assente","Sensibilità assente"]},
-  {key:"ossigenoLMin",label:"Ossigeno l/min",type:"number"},{key:"dolore",label:"Dolore",type:"number"},{key:"proiettatoDa",label:"Proiettato da (m)",type:"number"},{key:"lesioniNote",label:"Lesioni / note",type:"textarea"}]},
- {section:"Destinazione",fields:[
-  {key:"aziendaIstituto",label:"Azienda / Istituto"},{key:"invioCodice",label:"Invio V / G / R",options:["V","G","R"]},
-  {key:"trasportoCodice",label:"Trasporto V / G / R",options:["V","G","R"]},{key:"numeroMatricola",label:"N. matricola"},{key:"compilatore",label:"Compilatore"}]},
- {section:"Rifiuto trasporto / presidi",fields:[
-  {key:"rifiutoNote",label:"Note / dichiarazione",type:"textarea"},{key:"rifiutoCoscienza",label:"Coscienza"},
-  {key:"rifiutoRespiro",label:"Respiro"},{key:"rifiutoCircolo",label:"Circolo"},{key:"rifiutoCute",label:"Cute"},
-  {key:"rifiutoData",label:"Data accettazione",type:"date"},{key:"rifiutoOra",label:"Ora accettazione",type:"time"}]},
- {section:"Relazione",fields:[{key:"relazione",label:"Relazione di soccorso",type:"textarea"}]}
-];
+type Scheda = Record<string, any>;
 
-function formatTime(v?:string|null){return v ? new Date(v).toLocaleTimeString("it-IT") : "—";}
-function Field({f,value,onChange}:{f:any;value:any;onChange:(v:any)=>void}){
- if(f.type==="textarea") return <label className="field full"><span>{f.label}</span><textarea value={value??""} onChange={e=>onChange(e.target.value)}/></label>;
- if(f.type==="multi") return <div className="field full"><span>{f.label}</span><div className="checks">{f.options?.map((o:string)=><label key={o}><input type="checkbox" checked={Array.isArray(value)&&value.includes(o)} onChange={e=>{const a=Array.isArray(value)?[...value]:[];onChange(e.target.checked?[...a,o]:a.filter(x=>x!==o));}}/> {o}</label>)}</div></div>;
- if(f.options) return <label className="field"><span>{f.label}</span><select value={value??""} onChange={e=>onChange(e.target.value)}><option value="">—</option>{f.options.map((o:string)=><option key={o}>{o}</option>)}</select></label>;
- return <label className="field"><span>{f.label}</span><input type={f.type||"text"} value={value??""} onChange={e=>onChange(e.target.value)}/></label>;
-}
+function oggi() { return new Date().toISOString().slice(0,10); }
+function etichettaStato(s:string) { return s.replaceAll("_"," "); }
+function calcolaEta(data:string) { if(!data) return ""; const d=new Date(data); if(Number.isNaN(d.getTime())) return ""; const now=new Date(); let e=now.getFullYear()-d.getFullYear(); const m=now.getMonth()-d.getMonth(); if(m<0 || (m===0 && now.getDate()<d.getDate())) e--; return String(Math.max(0,e)); }
 
-export default function App(){
- const [mezzi,setMezzi]=useState<Mezzo[]>([]);
- const [interventi,setInterventi]=useState<Intervento[]>([]);
- const [allarme,setAllarme]=useState<string|null>(null);
- const [errore,setErrore]=useState<string|null>(null);
- const [selezionata,setSelezionata]=useState<Intervento|null>(null);
- const [scheda,setScheda]=useState<Record<string,any>>({});
- const [registro,setRegistro]=useState<EventoMissione[]>([]);
- const [salvando,setSalvando]=useState(false);
- const [indirizzo,setIndirizzo]=useState("");const [tipologia,setTipologia]=useState("");const [note,setNote]=useState("");
- const [nomeMezzo,setNomeMezzo]=useState("");const [targaMezzo,setTargaMezzo]=useState("");
+export default function App() {
+  const [mezzi,setMezzi]=useState<Mezzo[]>([]);
+  const [missioni,setMissioni]=useState<Intervento[]>([]);
+  const [data,setData]=useState(oggi());
+  const [errore,setErrore]=useState("");
+  const [priorita,setPriorita]=useState("verde");
+  const [indirizzo,setIndirizzo]=useState("");
+  const [tipologia,setTipologia]=useState("");
+  const [note,setNote]=useState("");
+  const [mezziSelezionati,setMezziSelezionati]=useState<string[]>([]);
+  const [missioneAperta,setMissioneAperta]=useState<Intervento|null>(null);
+  const [scheda,setScheda]=useState<Scheda>({});
+  const [mezzoFocus,setMezzoFocus]=useState<Mezzo|null>(null);
+  const [socket,setSocket]=useState<Socket|null>(null);
 
- async function get(path:string,options?:RequestInit){const r=await fetch(API_URL+path,options);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.errore||"Errore");return d}
- const refresh=async()=>{const [m,i]=await Promise.all([get("/mezzi"),get("/interventi")]);setMezzi(m);setInterventi(i);};
- useEffect(()=>{refresh().catch(e=>setErrore(e.message));const socket:Socket=io(API_URL);socket.emit("registra",{ruolo:"centrale"});
-  const sync=(i:Intervento)=>{setInterventi(p=>p.some(x=>x.id===i.id)?p.map(x=>x.id===i.id?i:x):[i,...p]);if(selezionata?.id===i.id){setSelezionata(i);setScheda(i.scheda_missione||{});loadRegistro(i.id)}};
-  socket.on("nuovo_intervento",sync);socket.on("intervento_assegnato",sync);socket.on("intervento_confermato",sync);socket.on("missione_aggiornata",sync);socket.on("scheda_missione_aggiornata",sync);
-  socket.on("stato_mezzo",(m:Mezzo)=>setMezzi(p=>p.map(x=>x.id===m.id?m:x)));socket.on("posizione_mezzo",(m:Mezzo)=>setMezzi(p=>p.map(x=>x.id===m.id?m:x)));
-  socket.on("attivazione_senza_risposta",(p:any)=>setAllarme(`Nessuna risposta dalla missione ${p.numeroMissione||p.interventoId}.`));
-  return()=>socket.disconnect();
- },[selezionata?.id]);
+  async function carica() {
+    if(!API_URL) return;
+    try {
+      const [m,i] = await Promise.all([fetch(`${API_URL}/mezzi`),fetch(`${API_URL}/interventi?data=${data}`)]);
+      if(!m.ok || !i.ok) throw new Error("Backend non raggiungibile");
+      setMezzi(await m.json()); setMissioni(await i.json()); setErrore("");
+    } catch(e:any) { setErrore(e.message || "Backend non raggiungibile. Controlla VITE_API_URL su Vercel."); }
+  }
+  useEffect(()=>{ carica(); },[data]);
+  useEffect(()=>{
+    if(!API_URL) return;
+    const s=io(API_URL,{transports:["websocket","polling"]}); setSocket(s); s.emit("registra",{ruolo:"centrale"});
+    s.on("posizione_mezzo",(m:Mezzo)=>setMezzi(x=>x.map(v=>v.id===m.id?m:v)));
+    s.on("stato_mezzo",(m:Mezzo)=>setMezzi(x=>x.map(v=>v.id===m.id?m:v)));
+    s.on("nuovo_intervento",()=>carica()); s.on("intervento_assegnato",()=>carica()); s.on("intervento_confermato",()=>carica()); s.on("stato_missione",()=>carica()); s.on("intervento_concluso",()=>carica()); s.on("scheda_aggiornata",()=>carica());
+    return ()=>{s.disconnect();};
+  },[]);
 
- async function loadMissione(id:string){const d=await get(`/interventi/${id}`);setSelezionata(d);setScheda(d.scheda_missione||{});setRegistro(d.registro||[]);}
- async function loadRegistro(id:string){const d=await get(`/interventi/${id}/registro`);setRegistro(d);}
- async function salvaScheda(){if(!selezionata)return;setSalvando(true);try{const d=await get(`/interventi/${selezionata.id}/scheda`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({scheda})});setSelezionata(d);setInterventi(p=>p.map(i=>i.id===d.id?d:i));}finally{setSalvando(false)}}
- async function creaIntervento(e:React.FormEvent){e.preventDefault();try{await get("/interventi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({indirizzo,tipologia,note})});setIndirizzo("");setTipologia("");setNote("");await refresh()}catch(e:any){setErrore(e.message)}}
- async function assegna(id:string,mezzoId:string){try{await get(`/interventi/${id}/assegna`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mezzoId})});await refresh()}catch(e:any){setErrore(e.message)}}
- async function statoManuale(mezzoId:string,stato:string){try{await get(`/mezzi/${mezzoId}/stato`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({stato})});await refresh()}catch(e:any){setErrore(e.message)}}
- async function creaMezzo(e:React.FormEvent){e.preventDefault();try{await get("/mezzi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nome:nomeMezzo,targa:targaMezzo})});setNomeMezzo("");setTargaMezzo("");await refresh()}catch(e:any){setErrore(e.message)}}
- const attivi=useMemo(()=>interventi.filter(i=>i.stato!=="concluso"&&i.stato!=="annullato"),[interventi]);
- const mezzoNome=(id?:string|null)=>mezzi.find(m=>m.id===id)?.nome||"—";
+  async function creaMissione(e:React.FormEvent){ e.preventDefault(); setErrore(""); if(!indirizzo.trim()) return; try { const r=await fetch(`${API_URL}/interventi`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({indirizzo,tipologia:tipologia||undefined,note:note||undefined,priorita})}); if(!r.ok) throw new Error("Creazione missione fallita"); const m=await r.json(); if(mezziSelezionati.length){ await assegna(m.id,mezziSelezionati); } setIndirizzo("");setTipologia("");setNote("");setMezziSelezionati([]);await carica();setMissioneAperta(m); }catch(e:any){setErrore(e.message||"Errore");} }
+  async function assegna(id:string, ids=mezziSelezionati){ const r=await fetch(`${API_URL}/interventi/${id}/assegna`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mezzoIds:ids})}); if(!r.ok){const x=await r.json().catch(()=>({}));throw new Error(x.errore||"Assegnazione fallita");} }
+  async function confermaStato(m:Mezzo, stato:string){ if(!confirm(`Confermi il cambio stato di ${m.nome} in ${etichettaStato(stato)}?`)) return; try{await fetch(`${API_URL}/mezzi/${m.id}/stato`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({stato})});await carica();}catch{setErrore("Impossibile cambiare stato");} }
+  async function spostaMezzo(m:Mezzo, lat:number,lon:number){ await fetch(`${API_URL}/mezzi/${m.id}/posizione`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({lat,lon})}); }
+  async function cambiaFlag(m:Mezzo,c:string){ await fetch(`${API_URL}/mezzi/${m.id}/flag`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({colore:c})}); await carica(); }
+  async function cambiaStatoMissione(m:Intervento, stato:string){ const mezzoId=m.mezzo_id; if(!confirm(`Confermi “${stato}” per la missione ${m.numero_missione}?`)) return; await fetch(`${API_URL}/interventi/${m.id}/stato`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stato,mezzoId})}); await carica(); if(m.id===missioneAperta?.id) apriMissione(m.id); }
+  async function apriMissione(id:string){ const r=await fetch(`${API_URL}/interventi/${id}`); if(!r.ok)return; const m=await r.json();setMissioneAperta(m);setScheda(m.scheda_missione||{}); }
+  async function salvaScheda(){ if(!missioneAperta)return; await fetch(`${API_URL}/interventi/${missioneAperta.id}/scheda`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(scheda)}); await apriMissione(missioneAperta.id); }
 
- return <div className="app">
- <style>{`
- *{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;color:#172033;background:#f4f6f8}.app{display:flex;min-height:100vh}.map{width:45vw;position:sticky;top:0;height:100vh}.panel{width:55vw;padding:16px;overflow:auto}.card{background:#fff;border:1px solid #d9dee7;border-radius:12px;padding:14px;margin-bottom:12px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.field{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700}.field.full{grid-column:1/-1}.field input,.field select,.field textarea{padding:8px;border:1px solid #cbd5e1;border-radius:7px;font:inherit;font-weight:400}.field textarea{min-height:80px}.checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;font-weight:500}.checks label{border:1px solid #e2e8f0;border-radius:6px;padding:6px}.mission{border:1px solid #d8dee8;border-radius:10px;padding:10px;margin:8px 0}.mission.active{border-left:5px solid #b91c1c}.timeline{list-style:none;padding:0;margin:0}.timeline li{padding:7px 0;border-bottom:1px solid #eee;display:flex;gap:10px}.time{font-weight:800;min-width:68px}.modal{position:fixed;inset:0;background:#0008;z-index:100;display:flex;justify-content:center;align-items:center;padding:14px}.modalbox{background:#f4f6f8;width:min(1100px,100%);height:94vh;overflow:auto;border-radius:14px;padding:16px}.bar{display:flex;justify-content:space-between;gap:8px;align-items:center;position:sticky;top:-16px;background:#f4f6f8;padding:5px 0 12px;z-index:2}.pill{padding:4px 8px;border-radius:999px;background:#e2e8f0;font-size:12px}.danger{background:#fee2e2;color:#991b1b}.ok{background:#dcfce7;color:#166534}button{padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;cursor:pointer;font-weight:650}button.primary{background:#111827;color:#fff;border-color:#111827}button:hover{filter:brightness(.98)}@media(max-width:900px){.app{display:block}.map,.panel{width:100%}.map{height:38vh;position:relative}.grid{grid-template-columns:1fr}.checks{grid-template-columns:1fr 1fr}.field.full{grid-column:auto}}
- `}</style>
- <div className="map"><MapContainer center={[45.4642,9.19]} zoom={12} style={{height:"100%"}}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{mezzi.filter(m=>m.lat!=null&&m.lon!=null).map(m=><Marker key={m.id} position={[m.lat!,m.lon!]}><Popup><b>{m.nome}</b><br/>Stato: {m.stato}</Popup></Marker>)}</MapContainer></div>
- <div className="panel"><h2 style={{marginTop:0}}>Centrale Operativa</h2>
- {errore&&<div className="card danger">{errore}</div>}{allarme&&<div className="card danger">⚠️ {allarme}<br/><button onClick={()=>setAllarme(null)}>Chiudi</button></div>}
- <section className="card"><h3>Nuova attivazione</h3><form onSubmit={creaIntervento} className="grid"><label className="field full">Luogo / indirizzo<input value={indirizzo} onChange={e=>setIndirizzo(e.target.value)} required/></label><label className="field">Tipologia<input value={tipologia} onChange={e=>setTipologia(e.target.value)}/></label><label className="field">Note<input value={note} onChange={e=>setNote(e.target.value)}/></label><div className="field full"><button className="primary">CREA ATTIVAZIONE</button></div></form></section>
- <section className="card"><h3>Registro attivazioni</h3>{attivi.length===0&&<p>Nessuna missione attiva.</p>}{attivi.map(i=><div key={i.id} className={`mission ${i.stato!=="concluso"?"active":""}`}><div style={{display:"flex",justifyContent:"space-between",gap:8}}><div><b>{i.numero_missione||"—"}</b> · {i.indirizzo}<br/><small>{i.tipologia||""} · {ETICHETTA[i.stato]||i.stato} · stato missione: <b>{i.stato_missione}</b></small></div><button onClick={()=>loadMissione(i.id)}>APRI SCHEDA</button></div>
- {i.stato==="in_attesa"&&<select defaultValue="" onChange={e=>e.target.value&&assegna(i.id,e.target.value)} style={{marginTop:8,width:"100%",padding:7}}><option value="" disabled>Assegna mezzo...</option>{mezzi.filter(m=>m.stato==="disponibile").map(m=><option key={m.id} value={m.id}>{m.nome} {m.targa||""}</option>)}</select>}
- {i.stato!=="in_attesa"&&<small>Mezzo: {mezzoNome(i.mezzo_id)}</small>}
- </div>)}</section>
- <section className="card"><h3>Mezzi</h3>{mezzi.map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #eee"}}><span><b>{m.nome}</b> {m.targa&&<small>({m.targa})</small>}<br/><small style={{color:COLORE[m.stato]}}>{m.stato}</small></span><select value={m.stato} onChange={e=>statoManuale(m.id,e.target.value)}><option value="disponibile">disponibile</option><option value="impegnato">impegnato</option><option value="fuori_servizio">fuori servizio</option></select></div>)}<form onSubmit={creaMezzo} style={{display:"flex",gap:5,marginTop:10}}><input placeholder="Nome mezzo" value={nomeMezzo} onChange={e=>setNomeMezzo(e.target.value)} required/><input placeholder="Targa" value={targaMezzo} onChange={e=>setTargaMezzo(e.target.value)}/><button>Aggiungi</button></form></section>
- </div>
+  const missioniAttive=missioni.filter(x=>x.stato!=="concluso"&&x.stato!=="annullato");
+  const online=!!socket?.connected;
 
- {selezionata&&<div className="modal"><div className="modalbox"><div className="bar"><div><h2 style={{margin:0}}>{selezionata.numero_missione}</h2><small>{selezionata.indirizzo} · {selezionata.stato_missione}</small></div><button onClick={()=>setSelezionata(null)}>CHIUDI</button></div>
- <section className="card"><b>Registro operativo</b><ul className="timeline">{registro.map(r=><li key={r.id}><span className="time">{formatTime(r.creato_il)}</span><span>{r.stato}{r.dettagli?.rifiutoTrasporto&&<span className="pill danger"> RIFIUTO TRASPORTO</span>}</span></li>)}</ul></section>
- <section className="card"><h3>Dati della scheda missione — modificabili dalla Centrale</h3>{CAMPI.map(s=><div key={s.section} style={{marginBottom:16}}><h4>{s.section}</h4><div className="grid">{s.fields.map(f=><Field key={f.key} f={f} value={scheda[f.key]} onChange={v=>setScheda(p=>({...p,[f.key]:v}))}/>)}</div></div>)}<button className="primary" disabled={salvando} onClick={salvaScheda}>{salvando?"SALVATAGGIO...":"SALVA MODIFICHE SCHEDA"}</button></section>
- <section className="card"><h3>Orari registrati</h3><div className="grid"><div>Attivazione<br/><b>{formatTime(selezionata.creato_il)}</b></div><div>Presa in carico<br/><b>{formatTime(selezionata.ora_presa_in_carico)}</b></div><div>Arrivo sul posto<br/><b>{formatTime(selezionata.ora_arrivo)}</b></div><div>Rientro<br/><b>{formatTime(selezionata.ora_rientro)}</b></div></div></section>
- </div></div>}
- </div>
+  return <div className="app">
+    <header className="topbar"><div><div className="brand">IRIS <span>v2</span></div><div className="sub">Centrale Operativa · gestione missioni e mezzi</div></div><div className={`connection ${online?"on":"off"}`}><i/> {online?"Online":"Offline"}</div></header>
+    {errore&&<div className="error">{errore}</div>}
+    <div className="workspace">
+      <section className="mapPanel"><MapContainer center={[45.4642,9.19]} zoom={12} style={{height:"100%"}}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+        {mezzi.filter(m=>m.lat!==null&&m.lon!==null).map(m=><Marker key={m.id} position={[m.lat!,m.lon!]} icon={L.divIcon({html:`<div class="iris-marker" style="background:${colori[m.flag_colore]}">${m.nome.replace(/</g,"&lt;").slice(0,3)}</div>`,className:"iris-marker-wrap",iconSize:[36,36],iconAnchor:[18,18]})} draggable eventHandlers={{dragend:(e:any)=>{const p=e.target.getLatLng();spostaMezzo(m,p.lat,p.lng)}}}>
+          <Popup><b>{m.nome}</b><br/>Stato: <strong style={{color:statoColor[m.stato]}}>{etichettaStato(m.stato)}</strong><br/>Flag: <strong style={{color:colori[m.flag_colore]}}>{m.flag_colore}</strong><div className="popupBtns"><button onClick={()=>setMezzoFocus(m)}>Gestisci</button></div></Popup>
+        </Marker>)}
+      </MapContainer><div className="mapLegend"><b>MEZZI</b><span><i className="dot green"/>Disponibile</span><span><i className="dot orange"/>Impegnato</span><span><i className="dot gray"/>Fuori servizio</span></div></section>
+
+      <aside className="side">
+        <div className="sectionHead"><div><h2>Missioni</h2><small>Registro del giorno</small></div><input type="date" value={data} onChange={e=>setData(e.target.value)}/></div>
+        <form className="newMission" onSubmit={creaMissione}><div className="priorityRow">{["verde","giallo","rosso"].map(c=><button type="button" key={c} className={priorita===c?`priority active ${c}`:`priority ${c}`} onClick={()=>setPriorita(c)}>{c.toUpperCase()}</button>)}</div><input value={indirizzo} onChange={e=>setIndirizzo(e.target.value)} placeholder="Luogo / indirizzo evento *" required/><input value={tipologia} onChange={e=>setTipologia(e.target.value)} placeholder="Tipologia evento"/><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Note per l'equipaggio" rows={2}/><div className="assignTitle">Mezzi da attivare</div><div className="checks">{mezzi.filter(m=>m.stato==="disponibile").map(m=><label key={m.id}><input type="checkbox" checked={mezziSelezionati.includes(m.id)} onChange={e=>setMezziSelezionati(x=>e.target.checked?[...x,m.id]:x.filter(id=>id!==m.id))}/>{m.nome}</label>)}</div><button className="primary">CREA ATTIVAZIONE</button></form>
+
+        <div className="missionList">{missioniAttive.length===0?<div className="empty">Nessuna missione per questa giornata.</div>:missioniAttive.map(m=><button className="missionCard" key={m.id} onClick={()=>apriMissione(m.id)}><div className="missionTop"><strong>{m.numero_missione}</strong><span className={`prio ${m.priorita}`}>{m.priorita}</span></div><div className="missionAddress">{m.indirizzo}</div><div className="missionBottom"><span>{m.stato_operativo}</span><time>{new Date(m.creato_il).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})}</time></div></button>)}</div>
+
+        <div className="fleet"><div className="sectionHead"><div><h2>Mezzi</h2><small>Gestione rapida</small></div></div>{mezzi.map(m=><div className="fleetRow" key={m.id}><button className="fleetName" onClick={()=>setMezzoFocus(m)}><span className="flag" style={{background:colori[m.flag_colore]}}/><span><b>{m.nome}</b><small>{m.targa||""} · {etichettaStato(m.stato)}</small></span></button><select value={m.stato} onChange={e=>confermaStato(m,e.target.value)}>{statiMezzo.map(s=><option key={s} value={s}>{etichettaStato(s)}</option>)}</select></div>)}</div>
+      </aside>
+    </div>
+
+    {mezzoFocus&&<div className="modalBack" onMouseDown={()=>setMezzoFocus(null)}><div className="modal small" onMouseDown={e=>e.stopPropagation()}><div className="modalHead"><div><b>{mezzoFocus.nome}</b><small>{mezzoFocus.targa}</small></div><button onClick={()=>setMezzoFocus(null)}>×</button></div><h4>Stato mezzo</h4><div className="stateGrid">{statiMezzo.map(s=><button key={s} className={mezzoFocus.stato===s?"selected":""} onClick={()=>confermaStato(mezzoFocus,s)}>{etichettaStato(s)}</button>)}</div><h4>Flag posizione / disponibilità</h4><div className="stateGrid flags">{["verde","giallo","rosso"].map(c=><button key={c} style={{borderColor:colori[c]}} className={mezzoFocus.flag_colore===c?"selected":""} onClick={()=>cambiaFlag(mezzoFocus,c)}>{c}</button>)}</div><p className="hint">Puoi anche trascinare il marker direttamente sulla mappa.</p></div></div>}
+
+    {missioneAperta&&<div className="modalBack" onMouseDown={()=>setMissioneAperta(null)}><div className="modal missionModal" onMouseDown={e=>e.stopPropagation()}><div className="modalHead"><div><span className={`prio big ${missioneAperta.priorita}`}>{missioneAperta.priorita}</span><b>{missioneAperta.numero_missione}</b><small>{missioneAperta.indirizzo}</small></div><button onClick={()=>setMissioneAperta(null)}>×</button></div><div className="stateBar">{statiMissione.map(s=><button key={s} className={missioneAperta.stato_operativo===s?"current":""} onClick={()=>cambiaStatoMissione(missioneAperta,s)}>{s}</button>)}</div><div className="missionBody"><div className="timeline"><h3>Cronologia</h3>{(missioneAperta.eventi||[]).map((e:any)=><div className="event" key={e.id}><span>{new Date(e.creato_il).toLocaleTimeString("it-IT")}</span><b>{e.stato}</b></div>)}</div><div className="sheet"><h3>Scheda missione</h3><div className="grid2"><label>Data nascita<input type="date" value={scheda.dataNascita||""} onChange={e=>setScheda({...scheda,dataNascita:e.target.value,eta:calcolaEta(e.target.value)})}/></label><label>Età<input value={scheda.eta||""} readOnly/></label><label>Cognome<input value={scheda.cognome||""} onChange={e=>setScheda({...scheda,cognome:e.target.value})}/></label><label>Nome<input value={scheda.nome||""} onChange={e=>setScheda({...scheda,nome:e.target.value})}/></label></div><h4>Evento</h4><div className="checks multi">{["Casa","Strada","Uffici/esercizi pubblici","Impianto sportivo","Impianto lavorativo","Altro"].map(x=><label key={x}><input type="checkbox" checked={!!scheda.luogo?.includes(x)} onChange={e=>setScheda({...scheda,luogo:e.target.checked?[...(scheda.luogo||[]),x]:(scheda.luogo||[]).filter((v:string)=>v!==x)})}/>{x}</label>)}</div><h4>Parametri</h4><div className="checks multi">{["Polso periferico","Polso centrale","Polso assente","Ritmico","Aritmico","Cute calda","Cute fredda","Cute rosea","Cute pallida","Cute cianotica","Sudata","CPSS deviazione rima labiale","CPSS segni di lato","CPSS alterazioni linguaggio"].map(x=><label key={x}><input type="checkbox" checked={!!scheda.parametri?.includes(x)} onChange={e=>setScheda({...scheda,parametri:e.target.checked?[...(scheda.parametri||[]),x]:(scheda.parametri||[]).filter((v:string)=>v!==x)})}/>{x}</label>)}</div><h4>Prestazioni</h4><div className="checks multi">{["Ossigeno","Aspirazione cavo orale","Cannula OF","Ventilazione","RCP","Applicazione DAE","Trasmissione ECG","Rimozione casco","Collare cervicale","Barella cucchiaio","Tavola spinale","Sedia portantina","Materasso depressione","Estricatore","Steccobenda","Telo porta feriti","Fascia emostatica","Medicazione ferite","Immobilizzazione arti","Immobilizzazione spinale","Protezione termica"].map(x=><label key={x}><input type="checkbox" checked={!!scheda.prestazioni?.includes(x)} onChange={e=>setScheda({...scheda,prestazioni:e.target.checked?[...(scheda.prestazioni||[]),x]:(scheda.prestazioni||[]).filter((v:string)=>v!==x)})}/>{x}</label>)}</div><h4>Presidi</h4><textarea value={scheda.presidiNote||""} onChange={e=>setScheda({...scheda,presidiNote:e.target.value})} placeholder="Presidi / note aggiuntive" rows={3}/><h4>Lesioni e zone interessate</h4><textarea value={scheda.lesioni||""} onChange={e=>setScheda({...scheda,lesioni:e.target.value})} placeholder="Seleziona/descrivi le lesioni e indica la zona interessata" rows={3}/><h4>Destinazione</h4><div className="checks"><label><input type="radio" name="dest" checked={scheda.destinazione==="Pronto Soccorso"} onChange={()=>setScheda({...scheda,destinazione:"Pronto Soccorso"})}/>Pronto Soccorso</label><label><input type="radio" name="dest" checked={scheda.destinazione==="Altro"} onChange={()=>setScheda({...scheda,destinazione:"Altro"})}/>Altro</label></div>{scheda.destinazione==="Altro"&&<input value={scheda.destinazioneAltro||""} onChange={e=>setScheda({...scheda,destinazioneAltro:e.target.value})} placeholder="Specificare destinazione"/>}<h4>Anamnesi / relazione</h4><textarea value={scheda.anamnesi||""} onChange={e=>setScheda({...scheda,anamnesi:e.target.value})} rows={5}/><h4>Rifiuto</h4><div className="checks"><label><input type="checkbox" checked={!!scheda.rifiutoTrasporto} onChange={e=>setScheda({...scheda,rifiutoTrasporto:e.target.checked,rifiutoOra:e.target.checked?new Date().toISOString():""})}/>Rifiuto trasporto</label><label><input type="checkbox" checked={!!scheda.rifiutoPresidi} onChange={e=>setScheda({...scheda,rifiutoPresidi:e.target.checked,rifiutoOra:e.target.checked?new Date().toISOString():scheda.rifiutoOra})}/>Rifiuto presidi</label></div><label>Ora rifiuto<input type="time" value={scheda.rifiutoOra?new Date(scheda.rifiutoOra).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}):""} readOnly/></label><button className="primary" onClick={salvaScheda}>SALVA SCHEDA</button></div></div></div></div>}
+  </div>
 }

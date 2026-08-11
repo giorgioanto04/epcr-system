@@ -1,4 +1,4 @@
--- Schema iniziale IRIS v2 Open Source
+-- IRIS v2 - schema compatibile con la struttura originale.
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS operatori (
     cognome TEXT NOT NULL,
     ruolo TEXT NOT NULL CHECK (ruolo IN ('soccorritore', 'centrale', 'admin')),
     telefono TEXT,
-    push_token TEXT,               -- token FCM del device attivo
+    push_token TEXT,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     creato_il TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -16,12 +16,14 @@ CREATE TABLE IF NOT EXISTS operatori (
 
 CREATE TABLE IF NOT EXISTS mezzi (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    nome TEXT NOT NULL,                 -- es. "Ambulanza 1"
+    nome TEXT NOT NULL,
     targa TEXT,
     stato TEXT NOT NULL DEFAULT 'disponibile'
         CHECK (stato IN ('disponibile', 'impegnato', 'fuori_servizio')),
     lat DOUBLE PRECISION,
     lon DOUBLE PRECISION,
+    flag_colore TEXT NOT NULL DEFAULT 'verde'
+        CHECK (flag_colore IN ('verde', 'giallo', 'rosso')),
     ultimo_aggiornamento_gps TIMESTAMPTZ
 );
 
@@ -34,90 +36,84 @@ CREATE TABLE IF NOT EXISTS turni (
     creato_il TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS mission_progressivi (
+    giorno DATE PRIMARY KEY,
+    progressivo INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS interventi (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    numero_missione TEXT UNIQUE,
     mezzo_id UUID REFERENCES mezzi(id),
     indirizzo TEXT NOT NULL,
     lat DOUBLE PRECISION,
     lon DOUBLE PRECISION,
-    tipologia TEXT,                     -- es. codice/priorità intervento
+    tipologia TEXT,
+    priorita TEXT NOT NULL DEFAULT 'verde'
+        CHECK (priorita IN ('verde', 'giallo', 'rosso')),
     note TEXT,
     stato TEXT NOT NULL DEFAULT 'in_attesa'
         CHECK (stato IN ('in_attesa', 'assegnato', 'in_corso', 'concluso', 'annullato')),
+    stato_operativo TEXT NOT NULL DEFAULT 'Attivazione',
     creato_il TIMESTAMPTZ NOT NULL DEFAULT now(),
     ora_assegnazione TIMESTAMPTZ,
-    ora_presa_in_carico TIMESTAMPTZ,    -- conferma ricezione da app
+    ora_presa_in_carico TIMESTAMPTZ,
     ora_arrivo TIMESTAMPTZ,
-    ora_rientro TIMESTAMPTZ
+    ora_rientro TIMESTAMPTZ,
+    scheda_missione JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS missione_mezzi (
+    intervento_id UUID NOT NULL REFERENCES interventi(id) ON DELETE CASCADE,
+    mezzo_id UUID NOT NULL REFERENCES mezzi(id),
+    assegnato_il TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (intervento_id, mezzo_id)
+);
+
+CREATE TABLE IF NOT EXISTS eventi_missione (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    intervento_id UUID NOT NULL REFERENCES interventi(id) ON DELETE CASCADE,
+    mezzo_id UUID REFERENCES mezzi(id),
+    stato TEXT NOT NULL,
+    creato_il TIMESTAMPTZ NOT NULL DEFAULT now(),
+    nota TEXT
 );
 
 CREATE TABLE IF NOT EXISTS notifiche_attivazione (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     intervento_id UUID NOT NULL REFERENCES interventi(id),
-    operatore_id UUID REFERENCES operatori(id),   -- opzionale: attivazione via account operatore (push FCM)
-    mezzo_id UUID REFERENCES mezzi(id),            -- opzionale: attivazione via pagina web del mezzo (Socket.IO)
+    operatore_id UUID REFERENCES operatori(id),
+    mezzo_id UUID REFERENCES mezzi(id),
     inviata_il TIMESTAMPTZ NOT NULL DEFAULT now(),
-    confermata_il TIMESTAMPTZ,          -- NULL = nessuna risposta -> fallback
+    confermata_il TIMESTAMPTZ,
     esito TEXT DEFAULT 'inviata' CHECK (esito IN ('inviata', 'confermata', 'fallita', 'timeout')),
     CHECK (operatore_id IS NOT NULL OR mezzo_id IS NOT NULL)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_interventi_numero_missione ON interventi(numero_missione) WHERE numero_missione IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_interventi_stato ON interventi(stato);
+CREATE INDEX IF NOT EXISTS idx_interventi_creato_il ON interventi(creato_il);
 CREATE INDEX IF NOT EXISTS idx_mezzi_stato ON mezzi(stato);
-
--- Migrazione idempotente per database già esistenti (creati prima dell'introduzione
--- della pagina web del mezzo): rende operatore_id opzionale e aggiunge mezzo_id.
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'notifiche_attivazione' AND column_name = 'operatore_id'
-          AND is_nullable = 'NO'
-    ) THEN
-        ALTER TABLE notifiche_attivazione ALTER COLUMN operatore_id DROP NOT NULL;
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'notifiche_attivazione' AND column_name = 'mezzo_id'
-    ) THEN
-        ALTER TABLE notifiche_attivazione ADD COLUMN mezzo_id UUID REFERENCES mezzi(id);
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints
-        WHERE table_name = 'notifiche_attivazione' AND constraint_name = 'notifiche_attivazione_operatore_o_mezzo'
-    ) THEN
-        ALTER TABLE notifiche_attivazione
-            ADD CONSTRAINT notifiche_attivazione_operatore_o_mezzo
-            CHECK (operatore_id IS NOT NULL OR mezzo_id IS NOT NULL);
-    END IF;
-END $$;
-
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS numero_missione TEXT;
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS stato_missione TEXT DEFAULT 'Attivazione';
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS scheda_missione JSONB DEFAULT '{}'::jsonb;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_interventi_numero_missione ON interventi(numero_missione) WHERE numero_missione IS NOT NULL;
-CREATE TABLE IF NOT EXISTS eventi_missione (
- id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
- intervento_id UUID NOT NULL REFERENCES interventi(id) ON DELETE CASCADE,
- stato TEXT NOT NULL,
- dettagli JSONB NOT NULL DEFAULT '{}'::jsonb,
- creato_il TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE eventi_missione ADD COLUMN IF NOT EXISTS dettagli JSONB NOT NULL DEFAULT '{}'::jsonb;
-
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS numero_missione TEXT;
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS stato_missione TEXT DEFAULT 'Attivazione';
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS scheda_missione JSONB DEFAULT '{}'::jsonb;
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS rifiuto_trasporto BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE interventi ADD COLUMN IF NOT EXISTS ultimo_aggiornamento_missione TIMESTAMPTZ;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_interventi_numero_missione ON interventi(numero_missione) WHERE numero_missione IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_eventi_missione_intervento ON eventi_missione(intervento_id, creato_il);
 
--- Compatibilità con database creati con la precedente versione MVP.
-UPDATE interventi
-SET scheda_missione = '{}'::jsonb
-WHERE scheda_missione IS NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='mezzi' AND column_name='flag_colore') THEN
+    ALTER TABLE mezzi ADD COLUMN flag_colore TEXT NOT NULL DEFAULT 'verde';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interventi' AND column_name='numero_missione') THEN
+    ALTER TABLE interventi ADD COLUMN numero_missione TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interventi' AND column_name='priorita') THEN
+    ALTER TABLE interventi ADD COLUMN priorita TEXT NOT NULL DEFAULT 'verde';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interventi' AND column_name='stato_operativo') THEN
+    ALTER TABLE interventi ADD COLUMN stato_operativo TEXT NOT NULL DEFAULT 'Attivazione';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interventi' AND column_name='scheda_missione') THEN
+    ALTER TABLE interventi ADD COLUMN scheda_missione JSONB NOT NULL DEFAULT '{}'::jsonb;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interventi' AND column_name='ora_arrivo') THEN
+    ALTER TABLE interventi ADD COLUMN ora_arrivo TIMESTAMPTZ;
+  END IF;
+END $$;

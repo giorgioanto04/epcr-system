@@ -1,9 +1,9 @@
 {
   "name": "IRIS v2 - Postazione Mezzo",
-  "short_name": "IRIS v2 Mezzo",
+  "short_name": "IRIS v2",
   "start_url": "./index.html",
   "display": "fullscreen",
-  "background_color": "#1a1a1a",
-  "theme_color": "#c62828",
+  "background_color": "#0d1726",
+  "theme_color": "#0d1726",
   "orientation": "portrait"
 }

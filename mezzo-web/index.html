@@ -1,372 +1,330 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111827">
-<title>IRIS v2 · Postazione Mezzo</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>IRIS v2 - Mezzo</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#c62828" />
 <style>
-:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f4f6f8}
-*{box-sizing:border-box} body{margin:0} button,input,select,textarea{font:inherit}
-header{position:sticky;top:0;z-index:20;background:#111827;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
-header h1{font-size:16px;margin:0}.online{color:#86efac}.offline{color:#fca5a5}
-main{max-width:980px;margin:auto;padding:16px}.screen{display:none}.screen.active{display:block}
-.card{background:#fff;border:1px solid #d9dee7;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px #00000008}
-h2{margin:0 0 12px;font-size:22px}h3{margin:0 0 12px;font-size:17px}.muted{color:#667085}
-.mezzo-btn{width:100%;padding:15px;margin:7px 0;text-align:left;border:1px solid #cbd5e1;border-radius:12px;background:#fff;display:flex;justify-content:space-between;align-items:center}
-.badge{font-size:12px;padding:4px 8px;border-radius:999px;background:#eef2f7}.disponibile{background:#dcfce7}.impegnato{background:#fee2e2}.fuori_servizio{background:#e5e7eb}
-#schermata-attivazione{position:fixed;inset:0;background:#b91c1c;color:#fff;display:none;z-index:100;align-items:center;justify-content:center;text-align:center;padding:24px}
-#schermata-attivazione.active{display:flex;animation:flash 1s infinite}@keyframes flash{50%{background:#7f1d1d}}
-.alert-title{font-size:40px;font-weight:900}.mission-code{font-size:19px;font-weight:800;margin:6px 0 18px}.address{font-size:25px;font-weight:700;max-width:720px}
-.big{width:100%;max-width:520px;padding:16px 18px;border:0;border-radius:12px;font-weight:800;margin-top:14px}
-.danger{background:#fff;color:#b91c1c}.primary{background:#111827;color:#fff}.secondary{background:#e5e7eb;color:#111827}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.step{border:1px solid #d8dee8;background:#fff;border-radius:10px;padding:10px;font-size:13px}.step.current{border:2px solid #111827;font-weight:800}.step.done{background:#ecfdf3}.step small{display:block;color:#667085;margin-top:3px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:13px;font-weight:700}.field input,.field select,.field textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff}.field textarea{min-height:80px;resize:vertical}
-.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.check{display:flex;gap:7px;align-items:flex-start;border:1px solid #e1e5eb;padding:8px;border-radius:8px}
-.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{padding:12px 16px;border:0;border-radius:10px;font-weight:800}.next{background:#111827;color:#fff}.reject{background:#b91c1c;color:#fff}.disabled{opacity:.45;pointer-events:none}
-.timeline{list-style:none;padding:0;margin:0}.timeline li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #edf0f4}.time{font-variant-numeric:tabular-nums;font-weight:800;min-width:75px}
-@media(max-width:650px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.steps{grid-template-columns:1fr 1fr}.address{font-size:20px}}
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f2f2f2;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ---- Header ---- */
+  header {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  #stato-connessione {
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #444;
+  }
+  #stato-connessione.online { background: #2e7d32; }
+  #stato-connessione.offline { background: #b71c1c; }
+
+  main { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 16px; }
+
+  /* ---- Schermata selezione mezzo ---- */
+  #schermata-selezione { display: flex; flex-direction: column; gap: 12px; }
+  #schermata-selezione p { color: #555; font-size: 14px; margin: 0 0 4px; }
+  .lista-mezzi { display: flex; flex-direction: column; gap: 10px; }
+  .mezzo-btn {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mezzo-btn .targa { font-size: 13px; font-weight: 400; color: #888; }
+  .mezzo-btn .badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: #fff;
+    background: #9e9e9e;
+    text-transform: uppercase;
+  }
+  .mezzo-btn .badge.disponibile { background: #2e7d32; }
+  .mezzo-btn .badge.impegnato { background: #ef6c00; }
+  .mezzo-btn .badge.fuori_servizio { background: #757575; }
+
+  /* ---- Schermata attesa ---- */
+  #schermata-attesa { flex: 1; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; }
+  #schermata-attesa .mezzo-corrente { font-size: 20px; font-weight: 700; }
+  #schermata-attesa .sottotitolo { color: #666; font-size: 15px; }
+  #schermata-attesa .pallino {
+    width: 12px; height: 12px; border-radius: 50%; background: #2e7d32;
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 0%{opacity:.3} 50%{opacity:1} 100%{opacity:.3} }
+  #cambia-mezzo { margin-top: 20px; background: none; border: none; color: #1565c0; font-size: 14px; text-decoration: underline; }
+
+  /* ---- Schermata attivazione (allarme) ---- */
+  #schermata-attivazione {
+    display: none;
+    position: fixed; inset: 0;
+    background: #c62828;
+    color: #fff;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    gap: 16px;
+    z-index: 100;
+    animation: flash 1s infinite;
+  }
+  @keyframes flash { 0%,100% { background:#c62828; } 50% { background:#8e0000; } }
+  .mission-number{font-size:22px;font-weight:900;letter-spacing:1px}.priority-pill{font-size:13px;font-weight:900;text-transform:uppercase;padding:7px 13px;border-radius:999px;background:#fff;color:#111}#schermata-attivazione .titolo { font-size: 34px; font-weight: 800; letter-spacing: 1px; }
+  #schermata-attivazione .tipologia { font-size: 15px; text-transform: uppercase; opacity: .9; letter-spacing: 1px; }
+  #schermata-attivazione .indirizzo { font-size: 24px; font-weight: 600; max-width: 90%; }
+  #schermata-attivazione .note { font-size: 15px; opacity: .9; max-width: 90%; }
+  #schermata-attivazione .link-mappa { color: #fff; text-decoration: underline; font-size: 14px; }
+  #conferma-btn {
+    margin-top: 12px;
+    background: #fff;
+    color: #c62828;
+    border: none;
+    border-radius: 14px;
+    padding: 18px 32px;
+    font-size: 19px;
+    font-weight: 800;
+    width: 100%;
+    max-width: 340px;
+  }
+
+  button { cursor: pointer; }
 </style>
 </head>
 <body>
-<header><h1>IRIS v2 · Postazione Mezzo</h1><span id="stato-connessione">connessione...</span></header>
+
+<header>
+  <h1>IRIS v2 &middot; Postazione Mezzo</h1>
+  <span id="stato-connessione">connessione...</span>
+</header>
 
 <main>
-<section id="schermata-selezione" class="screen card">
-  <h2>Seleziona il mezzo</h2><p class="muted">Scegli il mezzo su cui sei in servizio.</p>
-  <div id="lista-mezzi">Carico l'elenco mezzi...</div>
-</section>
-
-<section id="schermata-attesa" class="screen card">
-  <h2 id="nome-mezzo-corrente"></h2><p class="muted">In attesa di attivazione dalla Centrale Operativa.</p>
-  <button id="cambia-mezzo" class="big secondary">Cambia mezzo</button>
-</section>
-
-<section id="schermata-missione" class="screen">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap">
-      <div><h2 id="missione-numero">Missione</h2><div id="missione-meta" class="muted"></div></div>
-      <strong id="missione-stato"></strong>
+  <!-- Selezione del mezzo dalla lista -->
+  <section id="schermata-selezione">
+    <p>Seleziona il mezzo su cui sei in servizio:</p>
+    <div id="lista-mezzi" class="lista-mezzi">
+      <p id="caricamento-mezzi">Carico l'elenco mezzi...</p>
     </div>
-  </div>
-  <div class="card"><div class="steps" id="steps"></div></div>
+  </section>
 
-  <form id="scheda-form">
-    <div class="card"><h3>Identificazione missione e mezzo</h3><div class="grid">
-      <div class="field"><label>Denominazione OdV</label><input name="denominazioneOdV"></div>
-      <div class="field"><label>Targa / cod. mezzo</label><input name="targaCodMezzo"></div>
-      <div class="field"><label>Km iniziali</label><input name="kmIniziali" type="number"></div>
-      <div class="field"><label>Km finali</label><input name="kmFinali" type="number"></div>
-      <div class="field"><label>Matr. autista</label><input name="matrAutista"></div>
-      <div class="field"><label>Matr. soccorritore 1</label><input name="matrSoccorritore1"></div>
-      <div class="field"><label>Matr. soccorritore 2</label><input name="matrSoccorritore2"></div>
-      <div class="field"><label>Convenzione</label><input name="convenzione"></div>
-      <div class="field"><label>N° interno</label><input name="numeroInterno"></div>
-    </div></div>
-
-    <div class="card"><h3>Luogo e informazioni relative al soccorso</h3><div class="grid">
-      <div class="field full"><label>Via / piazza</label><input name="luogoVia"></div>
-      <div class="field"><label>N. civico</label><input name="luogoCivico"></div>
-      <div class="field"><label>Piano / scala</label><input name="luogoPianoScala"></div>
-      <div class="field"><label>Comune</label><input name="luogoComune"></div>
-      <div class="field"><label>Data</label><input name="dataEvento" type="date"></div>
-    </div>
-    <p><b>Luogo dell'evento</b></p><div class="checks">
-      <label class="check"><input type="radio" name="luogoEvento" value="Casa"> Casa</label>
-      <label class="check"><input type="radio" name="luogoEvento" value="Strada"> Strada</label>
-      <label class="check"><input type="radio" name="luogoEvento" value="Uffici/esercizi pubblici"> Uffici/esercizi pubblici</label>
-      <label class="check"><input type="radio" name="luogoEvento" value="Impianto sportivo"> Impianto sportivo</label>
-      <label class="check"><input type="radio" name="luogoEvento" value="Impianto lavorativo"> Impianto lavorativo</label>
-      <label class="check"><input type="radio" name="luogoEvento" value="Altro"> Altro</label>
-    </div></div>
-
-    <div class="card"><h3>Informazioni relative al paziente</h3><div class="grid">
-      <div class="field"><label>Cognome</label><input name="cognome"></div>
-      <div class="field"><label>Nome</label><input name="nome"></div>
-      <div class="field"><label>Data di nascita</label><input name="dataNascita" type="date"></div>
-      <div class="field"><label>Età</label><input name="eta" type="number"></div>
-      <div class="field"><label>Cittadinanza</label><input name="cittadinanza"></div>
-      <div class="field"><label>Sesso</label><select name="sesso"><option value="">—</option><option>M</option><option>F</option></select></div>
-      <div class="field"><label>Comune di residenza</label><input name="comuneResidenza"></div>
-      <div class="field"><label>Via / piazza</label><input name="residenzaVia"></div>
-      <div class="field"><label>N. civico</label><input name="residenzaCivico"></div>
-      <div class="field"><label>Evento rilevato da</label><input name="eventoRilevatoDa"></div>
-    </div>
-    <p><b>Dati interni presenti</b></p><div class="checks">
-      <label class="check"><input type="checkbox" name="presenze" value="OdV"> OdV</label>
-      <label class="check"><input type="checkbox" name="presenze" value="MSA1"> MSA1</label>
-      <label class="check"><input type="checkbox" name="presenze" value="MSA2"> MSA2</label>
-      <label class="check"><input type="checkbox" name="presenze" value="CNSAS"> CNSAS</label>
-      <label class="check"><input type="checkbox" name="presenze" value="VVF"> VVF</label>
-      <label class="check"><input type="checkbox" name="presenze" value="CC"> CC</label>
-      <label class="check"><input type="checkbox" name="presenze" value="Polizia"> Polizia</label>
-      <label class="check"><input type="checkbox" name="presenze" value="Medico"> Medico</label>
-    </div></div>
-
-    <div class="card"><h3>Evento</h3><div class="checks">
-      <label class="check"><input type="checkbox" name="evento" value="Perdita di coscienza"> Perdita di coscienza</label>
-      <label class="check"><input type="checkbox" name="evento" value="Lesioni e aggravanti"> Lesioni e aggravanti</label>
-      <label class="check"><input type="checkbox" name="evento" value="Convulsioni"> Convulsioni</label>
-      <label class="check"><input type="checkbox" name="evento" value="Malessere"> Malessere</label>
-      <label class="check"><input type="checkbox" name="evento" value="Caduta"> Caduta</label>
-      <label class="check"><input type="checkbox" name="evento" value="Incidente stradale"> Incidente stradale</label>
-      <label class="check"><input type="checkbox" name="evento" value="Avvelenamenti"> Avvelenamenti</label>
-      <label class="check"><input type="checkbox" name="evento" value="Evento violento"> Evento violento</label>
-      <label class="check"><input type="checkbox" name="evento" value="Precipitato"> Precipitato</label>
-      <label class="check"><input type="checkbox" name="evento" value="Pedone/ciclo"> Pedone/ciclo</label>
-      <label class="check"><input type="checkbox" name="evento" value="Conducente moto"> Conducente moto</label>
-      <label class="check"><input type="checkbox" name="evento" value="Malore"> Malore</label>
-      <label class="check"><input type="checkbox" name="evento" value="Travaglio/parto"> Travaglio/parto</label>
-      <label class="check"><input type="checkbox" name="evento" value="Infortunio"> Infortunio</label>
-      <label class="check"><input type="checkbox" name="evento" value="Auto passeggero"> Auto passeggero</label>
-      <label class="check"><input type="checkbox" name="evento" value="Altro"> Altro</label>
-    </div><div class="grid" style="margin-top:10px">
-      <div class="field"><label>Perdita di coscienza: ora</label><input name="oraPerditaCoscienza" type="time"></div>
-      <div class="field"><label>Precipitato da (m)</label><input name="precipitatoDa" type="number"></div><div class="field"><label>Proiettato da (m)</label><input name="proiettatoDa" type="number"></div>
-    </div></div>
-
-    <div class="card"><h3>Valutazione paziente e parametri</h3><div class="grid">
-      <div class="field"><label>Stato coscienza</label><select name="coscienza"><option value="">—</option><option>Sveglio</option><option>Reagisce alla chiamata</option><option>Reagisce al dolore</option><option>Assente</option><option>Incosciente</option></select></div>
-      <div class="field"><label>Respiro</label><select name="respiro"><option value="">—</option><option>Normale</option><option>Difficoltoso</option><option>Assente</option></select></div>
-      <div class="field"><label>Circolo</label><select name="circolo"><option value="">—</option><option>Periferico</option><option>Centrale</option><option>Ritmico</option><option>Aritmico</option><option>Assente</option></select></div>
-      <div class="field"><label>Cute</label><select name="cute"><option value="">—</option><option>Calda</option><option>Fredda</option><option>Rosea</option><option>Cianotica</option><option>Pallida</option><option>Sudata</option></select></div>
-      <div class="field"><label>Postura di rinvenimento</label><select name="postura"><option value="">—</option><option>In piedi</option><option>Seduta</option><option>Prona</option><option>Supina</option><option>Laterale</option></select></div>
-      <div class="field"><label>CPSS</label><select name="cpss"><option value="">—</option><option>Deviazione rima labiale</option><option>Segni di lato</option><option>Alterazioni del linguaggio</option></select></div>
-      <div class="field"><label>CPSS valutazione 1</label><input name="cpssVal1"></div>
-      <div class="field"><label>CPSS valutazione 2</label><input name="cpssVal2"></div>
-      <div class="field"><label>CPSS valutazione 3</label><input name="cpssVal3"></div>
-      <div class="field"><label>Ora insorgenza sintomi</label><input name="oraInsorgenzaSintomi" type="time"></div>
-      <div class="field"><label>FR</label><input name="fr" type="number"></div>
-      <div class="field"><label>Sat. aria %</label><input name="satAria" type="number"></div>
-      <div class="field"><label>Sat. O2 %</label><input name="satO2" type="number"></div>
-      <div class="field"><label>FC</label><input name="fc" type="number"></div>
-      <div class="field"><label>PA</label><input name="pa"></div>
-      <div class="field"><label>Temp. °C</label><input name="temperatura" type="number" step="0.1"></div>
-      <div class="field"><label>Glicemia</label><input name="glicemia" type="number"></div>
-      <div class="field full"><label>Note</label><textarea name="noteValutazione"></textarea></div>
-    </div></div>
-
-    <div class="card"><h3>RCP / arresto cardiocircolatorio</h3><div class="grid">
-      <div class="field"><label>Inizio RCP - ora</label><input name="inizioRcpOra" type="time"></div>
-      <div class="field"><label>Nr. shock</label><input name="numeroShock" type="number"></div>
-      <div class="field"><label>ROSC - ora</label><input name="roscOra" type="time"></div>
-      <div class="field"><label>Esito</label><select name="esito"><option value="">—</option><option>Trasporto con RCP</option><option>RCP già in corso</option><option>ACC durante il trasporto</option><option>Deceduto</option></select></div>
-      <div class="field full"><label>Note / anamnesi AMPIA</label><textarea name="anamnesiAmpia"></textarea></div>
-    </div></div>
-
-    <div class="card"><h3>Prestazioni / interventi e presidi utilizzati</h3>
-      <div class="checks">
-        <label class="check"><input type="checkbox" name="prestazioni" value="Ossigeno"> Ossigeno</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Aspirazione cavo orale"> Aspirazione cavo orale</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Cannula OF ventilazione"> Cannula OF ventilazione</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="RCP"> RCP</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Applicazione DAE"> Applicazione DAE</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Trasmissione ECG"> Trasmissione ECG</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Rimozione casco"> Rimozione casco</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Estricazione collare cervicale"> Estricazione collare cervicale</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Barella cucchiaio"> Barella cucchiaio</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Tavola spinale"> Tavola spinale</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Sedia portantina"> Sedia portantina</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Materasso depressione"> Materasso depressione</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Estricatore"> Estricatore</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Steccobenda"> Steccobenda</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Telo porta feriti"> Telo porta feriti</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Fascia emostatica"> Fascia emostatica</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Emostasi rapida"> Emostasi rapida</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Medicazione ferite"> Medicazione ferite</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Immobilizzazione arti"> Immobilizzazione arti</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Immobilizzazione spinale"> Immobilizzazione spinale</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Protezione termica"> Protezione termica</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Frattura esposta"> Frattura esposta</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Deformità"> Deformità</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Sanguinamento"> Sanguinamento</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Emorragia massiva"> Emorragia massiva</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Ferita"> Ferita</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Ferita penetrante"> Ferita penetrante</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Lacerazione/schiacciamento"> Lacerazione/schiacciamento</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Contusione"> Contusione</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Ustione"> Ustione</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Proiettato"> Proiettato</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Edema"> Edema</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Lesioni incompatibili con la vita"> Lesioni incompatibili con la vita</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Accesso difficile"> Accesso difficile</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Presenza deceduti"> Presenza deceduti</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Incastrato"> Incastrato</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Estricazione >20 min"> Estricazione >20 min</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Motilità assente"> Motilità assente</label>
-        <label class="check"><input type="checkbox" name="prestazioni" value="Sensibilità assente"> Sensibilità assente</label>
-      </div>
-      <div class="grid" style="margin-top:10px">
-        <div class="field"><label>Ossigeno l/min</label><input name="ossigenoLMin" type="number" step="0.1"></div>
-        <div class="field"><label>Dolore</label><input name="dolore" type="number"></div>
-        <div class="field full"><label>Lesioni / note</label><textarea name="lesioniNote" placeholder="Sanguinamento, emorragia massiva, ferita, ustione, edema, ecc."></textarea></div>
-      </div>
-    </div>
-
-    <div class="card"><h3>Destinazione e codici di intervento</h3><div class="grid">
-      <div class="field full"><label>Azienda / Istituto</label><input name="aziendaIstituto"></div>
-      <div class="field"><label>Invio V / G / R</label><select name="invioCodice"><option value="">—</option><option>V</option><option>G</option><option>R</option></select></div>
-      <div class="field"><label>Trasporto V / G / R</label><select name="trasportoCodice"><option value="">—</option><option>V</option><option>G</option><option>R</option></select></div>
-      <div class="field"><label>N. matricola</label><input name="numeroMatricola"></div>
-      <div class="field"><label>Compilatore</label><input name="compilatore"></div>
-    </div></div>
-
-    <div class="card"><h3>Rifiuto trasporto / presidi</h3><div class="grid">
-      <div class="field full"><label>Note sul rifiuto / dichiarazione</label><textarea name="rifiutoNote" placeholder="La scheda fonte prevede la sezione di rifiuto trasporto/presidi e i valori coscienza, respiro, circolo, cute."></textarea></div>
-      <div class="field"><label>Coscienza al rifiuto</label><input name="rifiutoCoscienza"></div>
-      <div class="field"><label>Respiro al rifiuto</label><input name="rifiutoRespiro"></div>
-      <div class="field"><label>Circolo al rifiuto</label><input name="rifiutoCircolo"></div>
-      <div class="field"><label>Cute al rifiuto</label><input name="rifiutoCute"></div>
-      <div class="field"><label>Firma / accettazione - data</label><input name="rifiutoData" type="date"></div>
-      <div class="field"><label>Firma / accettazione - ora</label><input name="rifiutoOra" type="time"></div>
-    </div></div>
-
-    <div class="card"><h3>Relazione di soccorso</h3><div class="field"><label>Note / relazione</label><textarea name="relazione" style="min-height:160px"></textarea></div></div>
-  </form>
-
-  <div class="card">
-    <h3>Registro operativo</h3>
-    <ul class="timeline" id="timeline"></ul>
-  </div>
-
-  <div class="card">
-    <div class="actions" id="mission-actions"></div>
-    <p class="muted" id="azione-help" style="margin-bottom:0"></p>
-  </div>
-</section>
+  <!-- In attesa di attivazione -->
+  <section id="schermata-attesa">
+    <div class="pallino"></div>
+    <div class="mezzo-corrente" id="nome-mezzo-corrente"></div>
+    <div class="sottotitolo">In attesa di attivazione dalla centrale...</div>
+    <div class="sottotitolo">Tieni questa pagina aperta sullo schermo.</div>
+    <button id="cambia-mezzo">Cambia mezzo</button>
+  </section>
 </main>
 
+<!-- Schermata a tutto schermo mostrata quando arriva un'attivazione -->
 <section id="schermata-attivazione">
-  <div>
-    <div class="alert-title">ATTIVAZIONE</div>
-    <div class="mission-code" id="att-numero"></div>
-    <div id="att-tipologia" style="text-transform:uppercase"></div>
-    <div class="address" id="att-indirizzo"></div>
-    <div id="att-note" style="margin-top:8px"></div>
-    <a id="att-mappa" href="#" target="_blank" rel="noopener" style="display:block;color:#fff;margin-top:10px">Apri indirizzo in mappa</a>
-    <button id="conferma-btn" class="big danger">CONFERMA PRESA IN CARICO</button>
-  </div>
+  <div class="titolo">ATTIVAZIONE</div>
+  <div class="mission-number" id="att-numero"></div>
+  <div class="priority-pill" id="att-priorita"></div>
+  <div class="tipologia" id="att-tipologia"></div>
+  <div class="indirizzo" id="att-indirizzo"></div>
+  <div class="note" id="att-note"></div>
+  <a class="link-mappa" id="att-mappa" href="#" target="_blank" rel="noopener">Apri indirizzo in mappa</a>
+  <button id="conferma-btn">CONFERMA PRESA IN CARICO</button>
 </section>
 
-<audio id="suono-attivazione" loop preload="auto"><source src="attivazione.mp3" type="audio/mpeg"></audio>
+<audio id="suono-attivazione" loop preload="auto">
+  <source src="attivazione.mp3" type="audio/mpeg" />
+</audio>
+
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-(function(){
-const params=new URLSearchParams(location.search);
-const API_URL=params.get("api")||localStorage.getItem("iris-v2_api_url")||"http://localhost:3000";
-localStorage.setItem("iris-v2_api_url",API_URL);
-const STORAGE_KEY="iris-v2_mezzo_selezionato";
-const stati=["Attivazione","Partenza","Arrivo sul posto","Paziente visto","Partenza per ospedale","Arrivo ospedale","Libero in Ospedale","Rientro","Disponibile"];
-const next={Attivazione:["Partenza"],Partenza:["Arrivo sul posto"],"Arrivo sul posto":["Paziente visto"],"Paziente visto":["Partenza per ospedale","Rientro"],"Partenza per ospedale":["Arrivo ospedale"],"Arrivo ospedale":["Libero in Ospedale"],"Libero in Ospedale":["Rientro"],Rientro:["Disponibile"],Disponibile:[]};
-const $=id=>document.getElementById(id);
-let mezzo=null, missione=null, socket=null, allarmeAudio=null;
-const screens={selezione:$("schermata-selezione"),attesa:$("schermata-attesa"),missione:$("schermata-missione"),attivazione:$("schermata-attivazione")};
+(function () {
+  // ---------------------------------------------------------------
+  // Configurazione: URL del backend. Modificalo con il tuo dominio
+  // Render (es. https://epcr-backend.onrender.com) prima del deploy,
+  // oppure passalo come ?api=https://... nella URL della pagina.
+  // ---------------------------------------------------------------
+  const params = new URLSearchParams(location.search);
+  const API_URL = params.get("api") || window.IRIS_API_URL || "https://TUO-SERVIZIO.onrender.com"; localStorage.setItem("iris_api_url", API_URL);
 
-function vai(nome){Object.values(screens).forEach(x=>x.classList.remove("active"));screens[nome].classList.add("active")}
-function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
-function badge(s){return `<span class="badge ${s}">${esc((s||"").replaceAll("_"," "))}</span>`}
+  const STORAGE_KEY = "iris_mezzo_selezionato";
 
-async function api(path,options){const r=await fetch(API_URL+path,options);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.errore||"Errore");return d}
+  const elSelezione = document.getElementById("schermata-selezione");
+  const elAttesa = document.getElementById("schermata-attesa");
+  const elAttivazione = document.getElementById("schermata-attivazione");
+  const elListaMezzi = document.getElementById("lista-mezzi");
+  const elNomeMezzoCorrente = document.getElementById("nome-mezzo-corrente");
+  const elStatoConnessione = document.getElementById("stato-connessione");
+  const elSuono = document.getElementById("suono-attivazione");
 
-async function caricaMezzi(){
- try{const ms=await api("/mezzi");$("lista-mezzi").innerHTML=ms.length?ms.map(m=>`<button class="mezzo-btn" data-id="${m.id}"><span><b>${esc(m.nome)}</b><br><small>${esc(m.targa||"")}</small></span>${badge(m.stato)}</button>`).join(""):"<p>Nessun mezzo configurato.</p>";
- document.querySelectorAll(".mezzo-btn").forEach(b=>b.onclick=()=>selezionaMezzo(ms.find(m=>m.id===b.dataset.id)));
- }catch(e){$("lista-mezzi").textContent="Backend non raggiungibile."}
-}
-function selezionaMezzo(m){mezzo=m;localStorage.setItem(STORAGE_KEY,JSON.stringify(m));$("nome-mezzo-corrente").textContent=m.nome;vai("attesa");connettiSocket()}
-function connettiSocket(){
- if(socket)socket.disconnect();socket=io(API_URL,{transports:["websocket","polling"]});
- socket.on("connect",()=>{ $("stato-connessione").textContent="online";$("stato-connessione").className="online";socket.emit("registra",{ruolo:"mezzo",id:mezzo.id})});
- socket.on("disconnect",()=>{$("stato-connessione").textContent="offline";$("stato-connessione").className="offline"});
- socket.on("attivazione",mostraAttivazione);
-}
-function startAlarm(){
- const audio=$("suono-attivazione");audio.currentTime=0;audio.play().catch(()=>{});
- // Fallback WebAudio: permette un allarme anche se non è stato fornito attivazione.mp3.
- try{
-  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-  const ctx=new C();let stop=false;
-  const beep=()=>{if(stop)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type="square";o.frequency.value=880;g.gain.value=.12;o.connect(g);g.connect(ctx.destination);o.start();setTimeout(()=>{o.frequency.value=660},260);setTimeout(()=>{o.stop();setTimeout(beep,180)},520)};
-  beep();allarmeAudio={stop:()=>{stop=true;ctx.close()}};
- }catch{}
-}
-function stopAlarm(){ $("suono-attivazione").pause();if(allarmeAudio){allarmeAudio.stop();allarmeAudio=null} if(navigator.vibrate)navigator.vibrate(0)}
-function mostraAttivazione(d){
- missione={id:d.interventoId,mezzoId:d.mezzoId,numeroMissione:d.numeroMissione,indirizzo:d.indirizzo,lat:d.lat,lon:d.lon,tipologia:d.tipologia,note:d.note,stato_missione:"Attivazione",scheda_missione:{}};
- $("att-numero").textContent=d.numeroMissione||"Missione";
- $("att-tipologia").textContent=d.tipologia||"";
- $("att-indirizzo").textContent=d.indirizzo||"";
- $("att-note").textContent=d.note||"";
- $("att-mappa").href=d.lat&&d.lon?`https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lon}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.indirizzo||"")}`;
- screens.attivazione.classList.add("active");startAlarm();if(navigator.vibrate)navigator.vibrate([700,300,700,300,700],true);
-}
-async function conferma(){
- if(!missione)return;stopAlarm();
- await api(`/interventi/${missione.id}/conferma-mezzo`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mezzoId:mezzo.id})});
- await caricaMissione(missione.id);vai("missione");
-}
-async function caricaMissione(id){
- const d=await api(`/interventi/${id}`);missione=d;riempiForm(d.scheda_missione||{});renderMissione();await renderRegistro()
-}
-function flatten(obj,prefix="",out={}){Object.entries(obj||{}).forEach(([k,v])=>{const key=prefix?prefix+"."+k:k;if(v&&typeof v==="object"&&!Array.isArray(v))flatten(v,key,out);else out[key]=v});return out}
-function readForm(){
- const data={};
- document.querySelectorAll("#scheda-form input,#scheda-form select,#scheda-form textarea").forEach(el=>{
-  if(el.type==="checkbox"){if(!data[el.name])data[el.name]=[];if(el.checked)data[el.name].push(el.value)}
-  else if(el.type==="radio"){if(el.checked)data[el.name]=el.value}
-  else data[el.name]=el.value;
- });
- return data;
-}
-function riempiForm(data){
- const flat=flatten(data);
- document.querySelectorAll("#scheda-form input,#scheda-form select,#scheda-form textarea").forEach(el=>{
-  if(el.type==="checkbox")el.checked=Array.isArray(flat[el.name])&&flat[el.name].includes(el.value);
-  else if(el.type==="radio")el.checked=flat[el.name]===el.value;
-  else if(flat[el.name]!==undefined)el.value=flat[el.name];
- });
-}
-async function salvaScheda(){if(!missione)return;const scheda=readForm();missione=await api(`/interventi/${missione.id}/scheda`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({scheda})});return scheda}
-function renderSteps(){
- const current=missione.stato_missione||"Attivazione";
- $("steps").innerHTML=stati.map((s,i)=>`<div class="step ${s===current?"current":stati.indexOf(s)<stati.indexOf(current)?"done":""}"><b>${i+1}. ${s}</b><small>${s===current?"IN CORSO":stati.indexOf(s)<stati.indexOf(current)?"Completato":"In attesa"}</small></div>`).join("");
-}
-function renderMissione(){
- $("missione-numero").textContent=missione.numero_missione||missione.numeroMissione||"Missione";
- $("missione-meta").textContent=`${missione.indirizzo||""} · ${missione.tipologia||""}`;
- $("missione-stato").textContent=missione.stato_missione;
- renderSteps();
- const current=missione.stato_missione||"Attivazione", opts=next[current]||[];
- const actions=$("mission-actions");actions.innerHTML="";
- opts.forEach(s=>{
-  const b=document.createElement("button");b.className="next";b.textContent=s.toUpperCase();b.onclick=()=>avanza(s);actions.appendChild(b);
- });
- if(current==="Paziente visto"){
-  const b=document.createElement("button");b.className="reject";b.textContent="RIFIUTO TRASPORTO → RIENTRO";b.onclick=()=>rifiutoTrasporto();actions.appendChild(b);
- }
- $("azione-help").textContent=current==="Paziente visto"?"Compila la scheda e scegli se trasportare oppure registrare il rifiuto.":"Il sistema abilita solo il prossimo passaggio previsto.";
-}
-async function avanza(stato){
- try{
-  const scheda=await salvaScheda();
-  missione=await api(`/interventi/${missione.id}/stato-missione`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stato,scheda})});
-  renderMissione();await renderRegistro();
-  if(stato==="Disponibile"){alert("Missione chiusa. Mezzo nuovamente DISPONIBILE.");vai("attesa");missione=null}
- }catch(e){alert(e.message)}
-}
-async function rifiutoTrasporto(){
- if(!confirm("Confermi il RIFIUTO DEL TRASPORTO? Verrà registrato e la missione passerà direttamente a Rientro."))return;
- const scheda=await salvaScheda();
- missione=await api(`/interventi/${missione.id}/stato-missione`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stato:"Rientro",scheda,rifiutoTrasporto:true})});
- renderMissione();await renderRegistro();
-}
-async function renderRegistro(){
- const rows=await api(`/interventi/${missione.id}/registro`);$("timeline").innerHTML=rows.map(r=>`<li><span class="time">${new Date(r.creato_il).toLocaleTimeString("it-IT")}</span><span><b>${esc(r.stato)}</b>${r.dettagli?.rifiutoTrasporto?" · RIFIUTO TRASPORTO":""}</span></li>`).join("");
-}
-$("conferma-btn").onclick=conferma;
-$("cambia-mezzo").onclick=()=>{localStorage.removeItem(STORAGE_KEY);if(socket)socket.disconnect();mezzo=null;vai("selezione");caricaMezzi()};
-let timer;document.querySelectorAll("#scheda-form input,#scheda-form select,#scheda-form textarea").forEach(el=>el.addEventListener("change",()=>{clearTimeout(timer);timer=setTimeout(()=>salvaScheda().catch(()=>{}),400)}));
-const saved=localStorage.getItem(STORAGE_KEY);if(saved){try{selezionaMezzo(JSON.parse(saved))}catch{vai("selezione");caricaMezzi()}}else{vai("selezione");caricaMezzi()}
+  let mezzoSelezionato = null; // { id, nome }
+  let interventoCorrente = null; // { interventoId, mezzoId }
+  let socket = null;
+
+  function vaiA(schermata) {
+    elSelezione.style.display = schermata === "selezione" ? "flex" : "none";
+    elAttesa.style.display = schermata === "attesa" ? "flex" : "none";
+    elAttivazione.style.display = schermata === "attivazione" ? "flex" : "none";
+  }
+
+  function badgeClasse(stato) {
+    return { disponibile: "disponibile", impegnato: "impegnato", fuori_servizio: "fuori_servizio" }[stato] || "";
+  }
+
+  async function caricaMezzi() {
+    elListaMezzi.innerHTML = "<p>Carico l'elenco mezzi...</p>";
+    try {
+      const res = await fetch(`${API_URL}/mezzi`);
+      if (!res.ok) throw new Error("risposta non ok");
+      const mezzi = await res.json();
+
+      if (!mezzi.length) {
+        elListaMezzi.innerHTML = "<p>Nessun mezzo configurato. Contatta la centrale.</p>";
+        return;
+      }
+
+      elListaMezzi.innerHTML = "";
+      mezzi.forEach((m) => {
+        const btn = document.createElement("button");
+        btn.className = "mezzo-btn";
+        btn.innerHTML = `
+          <span>${m.nome}${m.targa ? `<br/><span class="targa">${m.targa}</span>` : ""}</span>
+          <span class="badge ${badgeClasse(m.stato)}">${m.stato.replace("_", " ")}</span>
+        `;
+        btn.addEventListener("click", () => selezionaMezzo({ id: m.id, nome: m.nome }));
+        elListaMezzi.appendChild(btn);
+      });
+    } catch (err) {
+      elListaMezzi.innerHTML = `<p>Impossibile contattare il backend (${API_URL}). Verifica la connessione o l'indirizzo del server.</p>`;
+    }
+  }
+
+  function selezionaMezzo(mezzo) {
+    mezzoSelezionato = mezzo;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mezzo));
+    elNomeMezzoCorrente.textContent = mezzo.nome;
+    vaiA("attesa");
+    connettiSocket();
+  }
+
+  function connettiSocket() {
+    if (socket) socket.disconnect();
+
+    socket = io(API_URL, { transports: ["websocket", "polling"] });
+
+    socket.on("connect", () => {
+      elStatoConnessione.textContent = "online";
+      elStatoConnessione.className = "online";
+      socket.emit("registra", { ruolo: "mezzo", id: mezzoSelezionato.id });
+    });
+
+    socket.on("disconnect", () => {
+      elStatoConnessione.textContent = "offline";
+      elStatoConnessione.className = "offline";
+    });
+
+    socket.on("connect_error", () => {
+      elStatoConnessione.textContent = "errore connessione";
+      elStatoConnessione.className = "offline";
+    });
+
+    // Evento inviato dal backend quando la centrale assegna un intervento a QUESTO mezzo
+    socket.on("attivazione", (dati) => {
+      mostraAttivazione(dati);
+    });
+  }
+
+  function mostraAttivazione(dati) {
+    interventoCorrente = dati;
+    document.getElementById("att-numero").textContent = dati.numeroMissione || "";
+    document.getElementById("att-priorita").textContent = dati.priorita || "";
+    const colori = { verde: ["#15803d","#0f3d20"], giallo: ["#ca8a04","#713f12"], rosso: ["#dc2626","#7f1d1d"] };
+    const c = colori[dati.priorita] || colori.rosso;
+    elAttivazione.style.background = `linear-gradient(135deg, ${c[0]}, ${c[1]})`;
+    document.getElementById("att-tipologia").textContent = dati.tipologia || "";
+    document.getElementById("att-indirizzo").textContent = dati.indirizzo || "";
+    document.getElementById("att-note").textContent = dati.note || "";
+
+    const linkMappa = document.getElementById("att-mappa");
+    if (dati.lat && dati.lon) {
+      linkMappa.href = `https://www.google.com/maps/search/?api=1&query=${dati.lat},${dati.lon}`;
+    } else if (dati.indirizzo) {
+      linkMappa.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dati.indirizzo)}`;
+    }
+
+    vaiA("attivazione");
+
+    // Suono e vibrazione per attirare l'attenzione (funzionano solo a pagina aperta/attiva:
+    // un browser web non può "svegliare" il telefono a schermo spento come farebbe una vera
+    // push notification nativa - per quello serve l'app mobile o una configurazione Web Push).
+    elSuono.currentTime = 0;
+    elSuono.play().catch(() => {/* alcuni browser bloccano l'autoplay senza interazione utente */});
+    if (navigator.vibrate) navigator.vibrate([500, 250, 500, 250, 500]);
+  }
+
+  async function confermaPresaInCarico() {
+    if (!interventoCorrente) return;
+    elSuono.pause();
+    if (navigator.vibrate) navigator.vibrate(0);
+
+    try {
+      await fetch(`${API_URL}/interventi/${interventoCorrente.interventoId}/conferma-mezzo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mezzoId: mezzoSelezionato.id }),
+      });
+    } catch (err) {
+      console.error("Errore invio conferma:", err);
+    }
+
+    interventoCorrente = null;
+    vaiA("attesa");
+  }
+
+  document.getElementById("conferma-btn").addEventListener("click", confermaPresaInCarico);
+  document.getElementById("cambia-mezzo").addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    if (socket) socket.disconnect();
+    mezzoSelezionato = null;
+    vaiA("selezione");
+    caricaMezzi();
+  });
+
+  // All'avvio: se il mezzo era già stato scelto in precedenza, riparti da lì
+  const salvato = localStorage.getItem(STORAGE_KEY);
+  if (salvato) {
+    try {
+      selezionaMezzo(JSON.parse(salvato));
+    } catch {
+      vaiA("selezione");
+      caricaMezzi();
+    }
+  } else {
+    vaiA("selezione");
+    caricaMezzi();
+  }
 })();
 </script>
 </body>
