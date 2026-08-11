@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "ePCR Soccorritore",
+    "slug": "epcr-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "org.tuaassociazione.epcr",
+      "permissions": [
+        "NOTIFICATIONS",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "WAKE_LOCK"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "org.tuaassociazione.epcr",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification", "location"]
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "sounds": ["./assets/attivazione_alta_priorita.wav"]
+        }
+      ]
+    ]
+  }
+}
