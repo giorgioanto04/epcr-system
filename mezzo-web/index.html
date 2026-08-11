@@ -193,7 +193,7 @@
     setTimeout(()=>{ o.frequency.value=660; },180);
     setTimeout(()=>o.stop(),360);
   }
-  function startAlarm(){ prepareAudio(); stopAlarm(); beep(); alarmTimer=setInterval(beep,650); }
+  function startAlarm(){ preparaAudio(); stopAlarm(); beep(); alarmTimer=setInterval(beep,650); }
   function stopAlarm(){ if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;} }
 
   let mezzoSelezionato = null; // { id, nome }
