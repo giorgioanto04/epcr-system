@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "migrate": "node --loader tsx src/db/migrate.ts"
+    "migrate": "node --import tsx src/db/migrate.ts"
   },
   "dependencies": {
     "fastify": "^4.28.1",
