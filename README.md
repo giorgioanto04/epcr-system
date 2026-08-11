@@ -31,7 +31,10 @@ Impostare:
 - mappa mezzi con marker trascinabili;
 - flag colore del mezzo;
 - stati missione con timestamp e conferma;
-- scheda missione modificabile dalla CO;
+- scheda missione modificabile dalla CO, scaricabile come documento HTML;
+- brogliaccio giornaliero scaricabile in CSV;
+- dashboard CO a tre colonne con mezzi/stati, mappa operativa e missioni aperte/chiuse;
+- suoneria di attivazione WAV inclusa e usata dalla postazione mezzo;
 - collegamento realtime via Socket.IO;
 - push mobile tramite Firebase/Expo quando configurato.
 

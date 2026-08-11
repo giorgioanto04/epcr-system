@@ -152,6 +152,7 @@
   <button id="conferma-btn">CONFERMA PRESA IN CARICO</button>
 </section>
 
+<audio id="attivazione-audio" src="attivazione_alta_priorita.wav" preload="auto" loop></audio>
 <div id="audio-status" style="position:fixed;bottom:12px;right:12px;background:#111c;color:#fff;padding:7px 10px;border-radius:8px;font-size:12px;z-index:200">🔊 allarme pronto</div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -174,27 +175,37 @@
   const elNomeMezzoCorrente = document.getElementById("nome-mezzo-corrente");
   const elStatoConnessione = document.getElementById("stato-connessione");
   const elAudioStatus = document.getElementById("audio-status");
-  let audioCtx = null, alarmTimer = null;
+  const alarmAudio = document.getElementById("attivazione-audio");
+  let audioUnlocked = false;
 
-  function preparaAudio() {
+  async function preparaAudio() {
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!audioCtx) audioCtx = new Ctx();
-      audioCtx.resume();
+      alarmAudio.volume = 1;
+      await alarmAudio.play();
+      alarmAudio.pause();
+      alarmAudio.currentTime = 0;
+      audioUnlocked = true;
       elAudioStatus.textContent = "🔊 allarme pronto";
-    } catch(e) { elAudioStatus.textContent = "🔇 audio non disponibile"; }
+    } catch(e) {
+      // Il browser richiede un gesto dell'utente: la selezione del mezzo chiama questa funzione.
+      elAudioStatus.textContent = "🔊 tocca per abilitare la suoneria";
+    }
   }
-  function beep() {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = "square"; o.frequency.value = 880; g.gain.value = 0.16;
-    o.connect(g); g.connect(audioCtx.destination); o.start();
-    setTimeout(()=>{ o.frequency.value=660; },180);
-    setTimeout(()=>o.stop(),360);
+  async function startAlarm() {
+    try {
+      alarmAudio.currentTime = 0;
+      alarmAudio.volume = 1;
+      await alarmAudio.play();
+      elAudioStatus.textContent = "🚨 ALLARME ATTIVO";
+    } catch(e) {
+      elAudioStatus.textContent = "🔇 premi lo schermo per attivare l'audio";
+    }
   }
-  function startAlarm(){ preparaAudio(); stopAlarm(); beep(); alarmTimer=setInterval(beep,650); }
-  function stopAlarm(){ if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;} }
+  function stopAlarm() {
+    alarmAudio.pause();
+    alarmAudio.currentTime = 0;
+    elAudioStatus.textContent = "🔊 allarme pronto";
+  }
 
   let mezzoSelezionato = null; // { id, nome }
   let interventoCorrente = null; // { interventoId, mezzoId }

@@ -5,6 +5,7 @@ import * as Device from "expo-device";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "https://TUO-SERVIZIO.onrender.com";
 const OPERATORE_ID = "INSERISCI-ID-OPERATORE"; // in produzione: da login
+const MEZZO_ID = process.env.EXPO_PUBLIC_MEZZO_ID || "";
 
 // Mostra la notifica anche con app in foreground, a volume massimo
 Notifications.setNotificationHandler({
@@ -60,12 +61,12 @@ export default function App() {
     registraPushToken();
 
     notificationListener.current = Notifications.addNotificationReceivedListener((notif) => {
-      const data = notif.request.content.data as { tipo?: string; interventoId?: string };
-      if (data.data.tipo === "attivazione" && data.interventoId) {
+      const data = notif.request.content.data as { tipo?: string; interventoId?: string; indirizzo?: string; mezzoId?: string };
+      if (data.tipo === "attivazione" && data.interventoId) {
         Vibration.vibrate([0, 500, 250, 500], true);
         setInterventoAttivo({
           id: data.interventoId,
-          indirizzo: (notif.request.content.body as string) ?? "",
+          indirizzo: data.indirizzo || (notif.request.content.body as string) || "",
         });
       }
     });
@@ -78,10 +79,11 @@ export default function App() {
   async function confermaAttivazione() {
     if (!interventoAttivo) return;
     Vibration.cancel();
-    await fetch(`${API_URL}/interventi/${interventoAttivo.id}/conferma`, {
+    // La conferma della notifica deve indicare anche il mezzo assegnato.
+    await fetch(`${API_URL}/interventi/${interventoAttivo.id}/conferma-mezzo`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ operatoreId: OPERATORE_ID }),
+      body: JSON.stringify({ mezzoId: data.mezzoId || MEZZO_ID }),
     });
     setInterventoAttivo(null);
   }

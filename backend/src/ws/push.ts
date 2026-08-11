@@ -31,6 +31,7 @@ interface AttivazionePayload {
   interventoId: string;
   indirizzo: string;
   tipologia?: string;
+  mezzoId?: string;
 }
 
 /**
@@ -54,6 +55,7 @@ export async function inviaNotificaAttivazione(pushToken: string, payload: Attiv
     data: {
       interventoId: payload.interventoId,
       tipologia: payload.tipologia ?? "",
+      mezzoId: payload.mezzoId ?? "",
       tipo: "attivazione",
     },
     android: {
