@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>IRIS v2 - Mezzo</title>
+<title>ePCR - Mezzo</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#c62828" />
 <style>
@@ -95,7 +95,7 @@
     animation: flash 1s infinite;
   }
   @keyframes flash { 0%,100% { background:#c62828; } 50% { background:#8e0000; } }
-  .mission-number{font-size:22px;font-weight:900;letter-spacing:1px}.priority-pill{font-size:13px;font-weight:900;text-transform:uppercase;padding:7px 13px;border-radius:999px;background:#fff;color:#111}#schermata-attivazione .titolo { font-size: 34px; font-weight: 800; letter-spacing: 1px; }
+  #schermata-attivazione .titolo { font-size: 34px; font-weight: 800; letter-spacing: 1px; }
   #schermata-attivazione .tipologia { font-size: 15px; text-transform: uppercase; opacity: .9; letter-spacing: 1px; }
   #schermata-attivazione .indirizzo { font-size: 24px; font-weight: 600; max-width: 90%; }
   #schermata-attivazione .note { font-size: 15px; opacity: .9; max-width: 90%; }
@@ -145,8 +145,6 @@
 <!-- Schermata a tutto schermo mostrata quando arriva un'attivazione -->
 <section id="schermata-attivazione">
   <div class="titolo">ATTIVAZIONE</div>
-  <div class="mission-number" id="att-numero"></div>
-  <div class="priority-pill" id="att-priorita"></div>
   <div class="tipologia" id="att-tipologia"></div>
   <div class="indirizzo" id="att-indirizzo"></div>
   <div class="note" id="att-note"></div>
@@ -154,9 +152,7 @@
   <button id="conferma-btn">CONFERMA PRESA IN CARICO</button>
 </section>
 
-<audio id="suono-attivazione" loop preload="auto">
-  <source src="attivazione.mp3" type="audio/mpeg" />
-</audio>
+<div id="audio-status" style="position:fixed;bottom:12px;right:12px;background:#111c;color:#fff;padding:7px 10px;border-radius:8px;font-size:12px;z-index:200">🔊 allarme pronto</div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
@@ -167,7 +163,7 @@
   // oppure passalo come ?api=https://... nella URL della pagina.
   // ---------------------------------------------------------------
   const params = new URLSearchParams(location.search);
-  const API_URL = params.get("api") || window.IRIS_API_URL || "https://epcr-system.onrender.com"; localStorage.setItem("iris_api_url", API_URL);
+  const API_URL = params.get("api") || "https://epcr-system.onrender.com"; localStorage.setItem("iris_api_url", API_URL);
 
   const STORAGE_KEY = "iris_mezzo_selezionato";
 
@@ -177,7 +173,28 @@
   const elListaMezzi = document.getElementById("lista-mezzi");
   const elNomeMezzoCorrente = document.getElementById("nome-mezzo-corrente");
   const elStatoConnessione = document.getElementById("stato-connessione");
-  const elSuono = document.getElementById("suono-attivazione");
+  const elAudioStatus = document.getElementById("audio-status");
+  let audioCtx = null, alarmTimer = null;
+
+  function preparaAudio() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      audioCtx.resume();
+      elAudioStatus.textContent = "🔊 allarme pronto";
+    } catch(e) { elAudioStatus.textContent = "🔇 audio non disponibile"; }
+  }
+  function beep() {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "square"; o.frequency.value = 880; g.gain.value = 0.16;
+    o.connect(g); g.connect(audioCtx.destination); o.start();
+    setTimeout(()=>{ o.frequency.value=660; },180);
+    setTimeout(()=>o.stop(),360);
+  }
+  function startAlarm(){ prepareAudio(); stopAlarm(); beep(); alarmTimer=setInterval(beep,650); }
+  function stopAlarm(){ if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;} }
 
   let mezzoSelezionato = null; // { id, nome }
   let interventoCorrente = null; // { interventoId, mezzoId }
@@ -222,6 +239,7 @@
   }
 
   function selezionaMezzo(mezzo) {
+    preparaAudio();
     mezzoSelezionato = mezzo;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(mezzo));
     elNomeMezzoCorrente.textContent = mezzo.nome;
@@ -258,12 +276,7 @@
 
   function mostraAttivazione(dati) {
     interventoCorrente = dati;
-    document.getElementById("att-numero").textContent = dati.numeroMissione || "";
-    document.getElementById("att-priorita").textContent = dati.priorita || "";
-    const colori = { verde: ["#15803d","#0f3d20"], giallo: ["#ca8a04","#713f12"], rosso: ["#dc2626","#7f1d1d"] };
-    const c = colori[dati.priorita] || colori.rosso;
-    elAttivazione.style.background = `linear-gradient(135deg, ${c[0]}, ${c[1]})`;
-    document.getElementById("att-tipologia").textContent = dati.tipologia || "";
+    document.getElementById("att-tipologia").textContent = `${dati.missioneNumero || ""} · ${(dati.priorita || "").toUpperCase()} · ${dati.tipologia || ""}`;
     document.getElementById("att-indirizzo").textContent = dati.indirizzo || "";
     document.getElementById("att-note").textContent = dati.note || "";
 
@@ -279,14 +292,13 @@
     // Suono e vibrazione per attirare l'attenzione (funzionano solo a pagina aperta/attiva:
     // un browser web non può "svegliare" il telefono a schermo spento come farebbe una vera
     // push notification nativa - per quello serve l'app mobile o una configurazione Web Push).
-    elSuono.currentTime = 0;
-    elSuono.play().catch(() => {/* alcuni browser bloccano l'autoplay senza interazione utente */});
+    startAlarm();
     if (navigator.vibrate) navigator.vibrate([500, 250, 500, 250, 500]);
   }
 
   async function confermaPresaInCarico() {
     if (!interventoCorrente) return;
-    elSuono.pause();
+    stopAlarm();
     if (navigator.vibrate) navigator.vibrate(0);
 
     try {
