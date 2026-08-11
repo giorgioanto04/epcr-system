@@ -17,6 +17,20 @@ async function missioneCompleta(id: string) {
 }
 
 export async function interventiRoutes(app: FastifyInstance) {
+  // Missione attiva del singolo mezzo: usata dal dispositivo di bordo all'avvio.
+  app.get("/interventi/mezzo/:mezzoId/attiva", async (req) => {
+    const { mezzoId } = req.params as { mezzoId: string };
+    const { rows } = await pool.query(`
+      SELECT i.id
+      FROM interventi i
+      JOIN intervento_mezzi im ON im.intervento_id=i.id
+      WHERE im.mezzo_id=$1 AND i.stato NOT IN ('concluso','annullato')
+      ORDER BY i.creato_il DESC LIMIT 1`, [mezzoId]);
+    if (!rows.length) return null;
+    const m = await missioneCompleta(rows[0].id);
+    const { rows: stati } = await pool.query("SELECT * FROM stati_intervento WHERE intervento_id=$1 ORDER BY registrato_il", [rows[0].id]);
+    return { ...m, cronologia: stati };
+  });
   app.get("/interventi", async (req) => {
     const { data } = req.query as { data?: string };
     const { rows } = data
@@ -76,9 +90,56 @@ export async function interventiRoutes(app: FastifyInstance) {
     return m;
   });
 
-  app.post("/interventi/:id/conferma-mezzo", async (req, reply)=>{const{id}=req.params as{id:string};const{mezzoId}=req.body as{mezzoId:string}; await pool.query(`UPDATE notifiche_attivazione SET confermata_il=now(),esito='confermata' WHERE intervento_id=$1 AND mezzo_id=$2 AND confermata_il IS NULL`,[id,mezzoId]); const r=await pool.query("UPDATE interventi SET ora_presa_in_carico=COALESCE(ora_presa_in_carico,now()),stato='in_corso' WHERE id=$1 RETURNING *",[id]); if(!r.rows.length)return reply.code(404).send({errore:"Missione non trovata"}); const m=await missioneCompleta(id); getIO().to("centrale").emit("intervento_confermato",m); return m;});
+  app.delete("/interventi/:id/mezzi/:mezzoId", async (req, reply)=>{
+    const { id, mezzoId } = req.params as { id:string; mezzoId:string };
+    const linked = await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2", [id, mezzoId]);
+    if (!linked.rows.length) return reply.code(404).send({ errore:"Mezzo non associato alla missione" });
+    await pool.query("DELETE FROM notifiche_attivazione WHERE intervento_id=$1 AND mezzo_id=$2", [id, mezzoId]);
+    await pool.query("DELETE FROM stati_intervento WHERE intervento_id=$1 AND mezzo_id=$2", [id, mezzoId]);
+    await pool.query("DELETE FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2", [id, mezzoId]);
+    await pool.query("UPDATE mezzi SET stato='disponibile' WHERE id=$1", [mezzoId]);
+    await pool.query("UPDATE interventi SET mezzo_id=CASE WHEN mezzo_id=$2 THEN (SELECT mezzo_id FROM intervento_mezzi WHERE intervento_id=$1 LIMIT 1) ELSE mezzo_id END, stato=CASE WHEN NOT EXISTS (SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1) THEN 'in_attesa' ELSE stato END WHERE id=$1", [id, mezzoId]);
+    const m = await missioneCompleta(id);
+    getIO().to("centrale").emit("mezzo_rimosso_missione", { missione:m, mezzoId });
+    getIO().to(`mezzo:${mezzoId}`).emit("missione_rimossa", { interventoId:id, mezzoId });
+    return m;
+  });
 
-  app.post("/interventi/:id/stato", async(req,reply)=>{const{id}=req.params as{id:string};const{stato,mezzoId}=req.body as{stato:string;mezzoId:string}; if(!STATI_MISSIONE.includes(stato as any))return reply.code(400).send({errore:"Stato non valido"}); if(!mezzoId)return reply.code(400).send({errore:"mezzoId obbligatorio"}); const exists=await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2",[id,mezzoId]); if(!exists.rows.length)return reply.code(409).send({errore:"Mezzo non associato alla missione"}); await pool.query("INSERT INTO stati_intervento(intervento_id,mezzo_id,stato) VALUES($1,$2,$3)",[id,mezzoId,stato]); const map:any={attivazione:'assegnato',partenza:'in_corso',arrivo_sul_posto:'in_corso',paziente_visto:'in_corso',partenza_ospedale:'in_corso',arrivo_ospedale:'in_corso',libero_in_ospedale:'in_corso',rientro:'in_corso',disponibile:'in_corso'}; await pool.query("UPDATE interventi SET stato=$1,ora_arrivo=CASE WHEN $2='arrivo_sul_posto' THEN now() ELSE ora_arrivo END,ora_rientro=CASE WHEN $2='rientro' THEN now() ELSE ora_rientro END WHERE id=$3",[map[stato],stato,id]); if(stato==='disponibile'){await pool.query("UPDATE mezzi SET stato='disponibile' WHERE id=$1",[mezzoId]); const pending=await pool.query(`SELECT 1 FROM intervento_mezzi im JOIN mezzi m ON m.id=im.mezzo_id WHERE im.intervento_id=$1 AND m.stato='impegnato'`,[id]); if(!pending.rows.length) await pool.query("UPDATE interventi SET stato='concluso' WHERE id=$1",[id]);} const m=await missioneCompleta(id); getIO().to("centrale").emit("stato_missione",{missione:m,mezzoId,stato}); return m;});
+  app.post("/interventi/:id/conferma-mezzo", async (req, reply)=>{
+    const{id}=req.params as{id:string};
+    const{mezzoId}=req.body as{mezzoId:string};
+    if(!mezzoId)return reply.code(400).send({errore:"mezzoId obbligatorio"});
+    const linked=await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2",[id,mezzoId]);
+    if(!linked.rows.length)return reply.code(409).send({errore:"Mezzo non associato alla missione"});
+    await pool.query(`UPDATE notifiche_attivazione SET confermata_il=now(),esito='confermata' WHERE intervento_id=$1 AND mezzo_id=$2 AND confermata_il IS NULL`,[id,mezzoId]);
+    await pool.query("UPDATE interventi SET ora_presa_in_carico=COALESCE(ora_presa_in_carico,now()),stato='in_corso' WHERE id=$1",[id]);
+    await pool.query("UPDATE mezzi SET stato='impegnato' WHERE id=$1",[mezzoId]);
+    const m=await missioneCompleta(id);
+    getIO().to("centrale").emit("intervento_confermato",m);
+    getIO().to(`mezzo:${mezzoId}`).emit("intervento_confermato",m);
+    return m;
+  });
+
+  app.post("/interventi/:id/stato", async(req,reply)=>{
+    const{id}=req.params as{id:string};
+    const{stato,mezzoId}=req.body as{stato:string;mezzoId:string};
+    if(!STATI_MISSIONE.includes(stato as any))return reply.code(400).send({errore:"Stato non valido"});
+    if(!mezzoId)return reply.code(400).send({errore:"mezzoId obbligatorio"});
+    const exists=await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2",[id,mezzoId]);
+    if(!exists.rows.length)return reply.code(409).send({errore:"Mezzo non associato alla missione"});
+    await pool.query("INSERT INTO stati_intervento(intervento_id,mezzo_id,stato) VALUES($1,$2,$3)",[id,mezzoId,stato]);
+    const map:any={attivazione:'assegnato',partenza:'in_corso',arrivo_sul_posto:'in_corso',paziente_visto:'in_corso',partenza_ospedale:'in_corso',arrivo_ospedale:'in_corso',libero_in_ospedale:'in_corso',rientro:'in_corso',disponibile:'in_corso'};
+    await pool.query("UPDATE interventi SET stato=$1,ora_arrivo=CASE WHEN $2='arrivo_sul_posto' THEN now() ELSE ora_arrivo END,ora_rientro=CASE WHEN $2='rientro' THEN now() ELSE ora_rientro END WHERE id=$3",[map[stato],stato,id]);
+    await pool.query("UPDATE mezzi SET stato=$1 WHERE id=$2",[stato==='disponibile'?'disponibile':'impegnato',mezzoId]);
+    if(stato==='disponibile'){
+      const pending=await pool.query(`SELECT 1 FROM intervento_mezzi im JOIN mezzi m ON m.id=im.mezzo_id WHERE im.intervento_id=$1 AND m.stato='impegnato'`,[id]);
+      if(!pending.rows.length) await pool.query("UPDATE interventi SET stato='concluso' WHERE id=$1",[id]);
+    }
+    const m=await missioneCompleta(id);
+    getIO().to("centrale").emit("stato_missione",{missione:m,mezzoId,stato});
+    getIO().to(`mezzo:${mezzoId}`).emit("stato_missione",{missione:m,mezzoId,stato});
+    return m;
+  });
 
   app.post("/interventi/:id/chiudi", async(req,reply)=>{const{id}=req.params as{id:string}; const{rows}=await pool.query("UPDATE interventi SET stato='concluso',ora_rientro=now() WHERE id=$1 RETURNING *",[id]); if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"}); await pool.query("UPDATE mezzi SET stato='disponibile' WHERE id IN (SELECT mezzo_id FROM intervento_mezzi WHERE intervento_id=$1)",[id]); const m=await missioneCompleta(id); getIO().to("centrale").emit("intervento_concluso",m); return m;});
 }

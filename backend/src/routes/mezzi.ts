@@ -43,6 +43,9 @@ export async function mezziRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const active = await pool.query(`SELECT 1 FROM intervento_mezzi im JOIN interventi i ON i.id=im.intervento_id WHERE im.mezzo_id=$1 AND i.stato NOT IN ('concluso','annullato') LIMIT 1`, [id]);
     if (active.rows.length) return reply.code(409).send({ errore: "Il mezzo è associato a una missione attiva" });
+    await pool.query("DELETE FROM notifiche_attivazione WHERE mezzo_id=$1", [id]);
+    await pool.query("DELETE FROM stati_intervento WHERE mezzo_id=$1", [id]);
+    await pool.query("DELETE FROM intervento_mezzi WHERE mezzo_id=$1", [id]);
     const { rows } = await pool.query("DELETE FROM mezzi WHERE id=$1 RETURNING *", [id]);
     if (!rows.length) return reply.code(404).send({ errore: "Mezzo non trovato" });
     getIO().to("centrale").emit("mezzo_eliminato", { id });
