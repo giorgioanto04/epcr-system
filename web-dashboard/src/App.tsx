@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { io, Socket } from "socket.io-client";
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://epcr-system.onrender.com";
 
 interface Mezzo {
   id: string;
