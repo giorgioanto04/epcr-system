@@ -1,6 +1,6 @@
 {
-  "name": "ePCR - Postazione Mezzo",
-  "short_name": "ePCR Mezzo",
+  "name": "IRIS v2 - Postazione Mezzo",
+  "short_name": "IRIS v2 Mezzo",
   "start_url": "./index.html",
   "display": "fullscreen",
   "background_color": "#1a1a1a",

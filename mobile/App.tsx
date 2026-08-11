@@ -141,7 +141,7 @@ export default function App(){
   return()=>sub.remove();
  },[]);
 
- if(!missione)return <View style={styles.container}><Text style={styles.title}>ePCR Soccorritore</Text><Text>In attesa di attivazioni...</Text></View>;
+ if(!missione)return <View style={styles.container}><Text style={styles.title}>IRIS v2 Soccorritore</Text><Text>In attesa di attivazioni...</Text></View>;
 
  const current=missione.stato_missione||"Attivazione";
  const actions=NEXT[current]||[];

@@ -1,6 +1,6 @@
-# ePCR Open Source
+# IRIS v2 Open Source
 
-Sistema open source ispirato ai CAD/ePCR professionali (es. Beta 80), pensato per
+Sistema open source ispirato ai CAD/IRIS v2 professionali (es. Beta 80), pensato per
 piccole associazioni di soccorso: attivazione mezzi in tempo reale, centrale
 operativa con mappa GPS, gestione turni e storico interventi.
 
@@ -10,7 +10,7 @@ operativa con mappa GPS, gestione turni e storico interventi.
 ## Architettura
 
 ```
-epcr-system/
+iris-v2-system/
 ├── backend/          Node.js + TypeScript + Fastify + PostgreSQL + Redis + Socket.IO
 ├── mobile/            App React Native (Expo) per i soccorritori (login con account operatore)
 ├── mezzo-web/          Pagina web (HTML/JS, no build) per il cellulare del mezzo: si
@@ -98,11 +98,11 @@ npx expo start
 ## Come caricarlo sul tuo GitHub
 
 ```bash
-# dentro la cartella epcr-system, dopo aver scaricato ed estratto lo zip
+# dentro la cartella iris-v2-system, dopo aver scaricato ed estratto lo zip
 git add .
 git commit -m "Initial scaffold: backend, mobile, dashboard"
 git branch -M main
-git remote add origin https://github.com/TUO-USERNAME/epcr-system.git
+git remote add origin https://github.com/TUO-USERNAME/iris-v2-system.git
 git push -u origin main
 ```
 

@@ -1,4 +1,4 @@
--- Schema iniziale ePCR Open Source
+-- Schema iniziale IRIS v2 Open Source
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

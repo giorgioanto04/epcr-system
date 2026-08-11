@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "ePCR Soccorritore",
-    "slug": "epcr-mobile",
+    "name": "IRIS v2 Soccorritore",
+    "slug": "iris-v2-mobile",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "android": {
-      "package": "org.tuaassociazione.epcr",
+      "package": "org.tuaassociazione.irisv2",
       "permissions": [
         "NOTIFICATIONS",
         "ACCESS_FINE_LOCATION",
@@ -15,7 +15,7 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "org.tuaassociazione.epcr",
+      "bundleIdentifier": "org.tuaassociazione.irisv2",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification", "location"]
       }

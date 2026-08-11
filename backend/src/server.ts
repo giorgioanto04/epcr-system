@@ -30,5 +30,5 @@ setupSocket(app);
 
 const port = Number(process.env.PORT ?? 3000);
 app.listen({ port, host: "0.0.0.0" }).then(() => {
-  console.log(`Backend ePCR in ascolto su http://localhost:${port}`);
+  console.log(`Backend IRIS v2 in ascolto su http://localhost:${port}`);
 });
