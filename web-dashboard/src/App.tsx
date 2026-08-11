@@ -1,3 +1,4 @@
+tsx
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { io, Socket } from "socket.io-client";
@@ -32,14 +33,11 @@ export default function App() {
   const [interventi, setInterventi] = useState<Intervento[]>([]);
   const [allarme, setAllarme] = useState<string | null>(null);
 
-  // form nuovo mezzo
   const [nomeMezzo, setNomeMezzo] = useState("");
 
-  // form nuovo intervento
   const [indirizzo, setIndirizzo] = useState("");
   const [tipologia, setTipologia] = useState("");
 
-  // assegnazione: mezzo scelto per ogni intervento in attesa
   const [mezzoScelto, setMezzoScelto] = useState<Record<string, string>>({});
 
   function ricarica() {
@@ -113,8 +111,6 @@ export default function App() {
       alert("Scegli prima un mezzo dal menu a tendina");
       return;
     }
-    // NOTA: qui serve anche un operatoreId reale collegato al mezzo/turno.
-    // Per ora, come placeholder di test, va creato un operatore e passato qui.
     const operatoreId = prompt(
       "ID operatore da attivare (in un secondo momento sarà scelto automaticamente in base al turno):"
     );
@@ -244,4 +240,3 @@ export default function App() {
     </div>
   );
 }
-Fatto
