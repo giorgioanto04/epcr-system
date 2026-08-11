@@ -11,6 +11,18 @@ await app.register(cors, { origin: "*" }); // in produzione: restringere
 
 app.get("/health", async () => ({ ok: true }));
 
+app.patch("/operatori/:id/push-token", async (req, reply) => {
+  const { id } = req.params as { id: string };
+  const { pushToken } = req.body as { pushToken?: string };
+  if (!pushToken) return reply.code(400).send({ errore: "pushToken obbligatorio" });
+  const { rows } = await (await import("./db/pool.js")).pool.query(
+    "UPDATE operatori SET push_token=$1 WHERE id=$2 RETURNING id",
+    [pushToken, id]
+  );
+  if (!rows.length) return reply.code(404).send({ errore: "Operatore non trovato" });
+  return { ok: true };
+});
+
 await app.register(mezziRoutes);
 await app.register(interventiRoutes);
 

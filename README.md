@@ -121,3 +121,51 @@ Crea prima il repository vuoto (senza README) su github.com, poi esegui i comand
 - [ ] Autenticazione utenti/ruoli (operatore centrale vs soccorritore)
 
 Vedi `docs/` per dettagli tecnici.
+
+
+## Gestione missione completa
+
+La versione aggiornata implementa il flusso operativo:
+`Attivazione → Partenza → Arrivo sul posto → Paziente visto → Partenza per ospedale → Arrivo ospedale → Libero in Ospedale → Rientro → Disponibile`.
+
+Dal passaggio **Paziente visto** è disponibile il percorso alternativo **Rifiuto trasporto → Rientro → Disponibile**.
+
+Ogni attivazione riceve automaticamente un numero missione e ogni cambio stato viene registrato con timestamp nel registro missione. La scheda missione è salvata in PostgreSQL come JSONB e può essere modificata sia dall'equipaggio sia dalla Centrale Operativa.
+
+La scheda digitale segue le sezioni presenti nel Mod. 16 Rev. 8 fornito: identificazione del mezzo, luogo, paziente, evento, valutazione e parametri, RCP/ROSC, prestazioni e presidi, destinazione/codici, relazione e rifiuto trasporto/presidi.
+
+### Allarme
+
+Il mezzo-web utilizza un allarme audio in loop più vibrazione. È presente anche un fallback WebAudio se il file audio non viene riprodotto. Nell'app mobile è configurato il canale Android ad alta priorità con il file `mobile/assets/attivazione_alta_priorita.wav`.
+
+**Nota:** il file audio incluso è un tono di allarme generato per il progetto, non una copia del suono proprietario di Emmaweb. Per usare esattamente il suono Emmaweb è necessario sostituire l'audio con il file che hai diritto a utilizzare.
+
+### Avvio
+
+Backend:
+```bash
+cd backend
+npm install
+npm run migrate
+npm run dev
+```
+
+Dashboard:
+```bash
+cd web-dashboard
+npm install
+npm run dev
+```
+
+Mezzo web:
+```bash
+cd mezzo-web
+npx serve .
+```
+
+App mobile:
+```bash
+cd mobile
+npm install
+npx expo start
+```

@@ -93,3 +93,31 @@ BEGIN
             CHECK (operatore_id IS NOT NULL OR mezzo_id IS NOT NULL);
     END IF;
 END $$;
+
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS numero_missione TEXT;
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS stato_missione TEXT DEFAULT 'Attivazione';
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS scheda_missione JSONB DEFAULT '{}'::jsonb;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_interventi_numero_missione ON interventi(numero_missione) WHERE numero_missione IS NOT NULL;
+CREATE TABLE IF NOT EXISTS eventi_missione (
+ id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+ intervento_id UUID NOT NULL REFERENCES interventi(id) ON DELETE CASCADE,
+ stato TEXT NOT NULL,
+ dettagli JSONB NOT NULL DEFAULT '{}'::jsonb,
+ creato_il TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE eventi_missione ADD COLUMN IF NOT EXISTS dettagli JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS numero_missione TEXT;
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS stato_missione TEXT DEFAULT 'Attivazione';
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS scheda_missione JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS rifiuto_trasporto BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE interventi ADD COLUMN IF NOT EXISTS ultimo_aggiornamento_missione TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_interventi_numero_missione ON interventi(numero_missione) WHERE numero_missione IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_eventi_missione_intervento ON eventi_missione(intervento_id, creato_il);
+
+-- Compatibilità con database creati con la precedente versione MVP.
+UPDATE interventi
+SET scheda_missione = '{}'::jsonb
+WHERE scheda_missione IS NULL;
