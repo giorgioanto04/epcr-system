@@ -17,6 +17,7 @@ interface Intervento {
   indirizzo: string;
   stato: string;
   tipologia?: string;
+  mezzo_id?: string | null;
   creato_il: string;
 }
 
@@ -31,29 +32,45 @@ export default function App() {
   const [interventi, setInterventi] = useState<Intervento[]>([]);
   const [allarme, setAllarme] = useState<string | null>(null);
 
-  useEffect(() => {
+  // form nuovo mezzo
+  const [nomeMezzo, setNomeMezzo] = useState("");
+
+  // form nuovo intervento
+  const [indirizzo, setIndirizzo] = useState("");
+  const [tipologia, setTipologia] = useState("");
+
+  // assegnazione: mezzo scelto per ogni intervento in attesa
+  const [mezzoScelto, setMezzoScelto] = useState<Record<string, string>>({});
+
+  function ricarica() {
     fetch(`${API_URL}/mezzi`).then((r) => r.json()).then(setMezzi);
     fetch(`${API_URL}/interventi`).then((r) => r.json()).then(setInterventi);
+  }
+
+  useEffect(() => {
+    ricarica();
 
     const socket: Socket = io(API_URL);
     socket.emit("registra", { ruolo: "centrale" });
 
-    socket.on("posizione_mezzo", (mezzo: Mezzo) => {
-      setMezzi((prev) => prev.map((m) => (m.id === mezzo.id ? mezzo : m)));
-    });
-
-    socket.on("stato_mezzo", (mezzo: Mezzo) => {
-      setMezzi((prev) => prev.map((m) => (m.id === mezzo.id ? mezzo : m)));
-    });
-
-    socket.on("nuovo_intervento", (intervento: Intervento) => {
-      setInterventi((prev) => [intervento, ...prev]);
-    });
-
-    socket.on("intervento_assegnato", (intervento: Intervento) => {
-      setInterventi((prev) => prev.map((i) => (i.id === intervento.id ? intervento : i)));
-    });
-
+    socket.on("posizione_mezzo", (mezzo: Mezzo) =>
+      setMezzi((prev) => prev.map((m) => (m.id === mezzo.id ? mezzo : m)))
+    );
+    socket.on("stato_mezzo", (mezzo: Mezzo) =>
+      setMezzi((prev) => prev.map((m) => (m.id === mezzo.id ? mezzo : m)))
+    );
+    socket.on("nuovo_intervento", (i: Intervento) =>
+      setInterventi((prev) => [i, ...prev])
+    );
+    socket.on("intervento_assegnato", (i: Intervento) =>
+      setInterventi((prev) => prev.map((x) => (x.id === i.id ? i : x)))
+    );
+    socket.on("intervento_confermato", (i: Intervento) =>
+      setInterventi((prev) => prev.map((x) => (x.id === i.id ? i : x)))
+    );
+    socket.on("intervento_concluso", (i: Intervento) =>
+      setInterventi((prev) => prev.map((x) => (x.id === i.id ? i : x)))
+    );
     socket.on("attivazione_senza_risposta", (payload: { interventoId: string }) => {
       setAllarme(
         `Nessuna conferma dal soccorritore per l'intervento ${payload.interventoId}. Intervieni manualmente.`
@@ -65,12 +82,65 @@ export default function App() {
     };
   }, []);
 
+  async function creaMezzo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nomeMezzo.trim()) return;
+    await fetch(`${API_URL}/mezzi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: nomeMezzo }),
+    });
+    setNomeMezzo("");
+    ricarica();
+  }
+
+  async function creaIntervento(e: React.FormEvent) {
+    e.preventDefault();
+    if (!indirizzo.trim()) return;
+    await fetch(`${API_URL}/interventi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ indirizzo, tipologia }),
+    });
+    setIndirizzo("");
+    setTipologia("");
+    ricarica();
+  }
+
+  async function assegna(interventoId: string) {
+    const mezzoId = mezzoScelto[interventoId];
+    if (!mezzoId) {
+      alert("Scegli prima un mezzo dal menu a tendina");
+      return;
+    }
+    // NOTA: qui serve anche un operatoreId reale collegato al mezzo/turno.
+    // Per ora, come placeholder di test, va creato un operatore e passato qui.
+    const operatoreId = prompt(
+      "ID operatore da attivare (in un secondo momento sarà scelto automaticamente in base al turno):"
+    );
+    if (!operatoreId) return;
+
+    await fetch(`${API_URL}/interventi/${interventoId}/assegna`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mezzoId, operatoreId }),
+    });
+    ricarica();
+  }
+
+  async function chiudi(interventoId: string) {
+    await fetch(`${API_URL}/interventi/${interventoId}/chiudi`, { method: "POST" });
+    ricarica();
+  }
+
+  const mezziDisponibili = mezzi.filter((m) => m.stato === "disponibile");
+
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ width: "60%", height: "100%" }}>
+      <div style={{ width: "55%", height: "100%" }}>
         <MapContainer center={[45.4642, 9.19]} zoom={12} style={{ height: "100%" }}>
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
+            attribution="&copy; OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {mezzi
@@ -87,7 +157,7 @@ export default function App() {
         </MapContainer>
       </div>
 
-      <div style={{ width: "40%", padding: 16, overflowY: "auto" }}>
+      <div style={{ width: "45%", padding: 16, overflowY: "auto" }}>
         <h2>Centrale Operativa</h2>
 
         {allarme && (
@@ -96,7 +166,41 @@ export default function App() {
           </div>
         )}
 
-        <h3>Mezzi</h3>
+        <section style={{ marginBottom: 24, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
+          <h3>Nuovo mezzo</h3>
+          <form onSubmit={creaMezzo} style={{ display: "flex", gap: 8 }}>
+            <input
+              placeholder="Nome mezzo (es. Ambulanza 1)"
+              value={nomeMezzo}
+              onChange={(e) => setNomeMezzo(e.target.value)}
+              style={{ flex: 1, padding: 6 }}
+            />
+            <button type="submit">Aggiungi</button>
+          </form>
+        </section>
+
+        <section style={{ marginBottom: 24, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
+          <h3>Nuovo intervento</h3>
+          <form onSubmit={creaIntervento} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input
+              placeholder="Indirizzo"
+              value={indirizzo}
+              onChange={(e) => setIndirizzo(e.target.value)}
+              style={{ padding: 6 }}
+            />
+            <input
+              placeholder="Tipologia (es. codice rosso)"
+              value={tipologia}
+              onChange={(e) => setTipologia(e.target.value)}
+              style={{ padding: 6 }}
+            />
+            <button type="submit" style={{ background: "#c62828", color: "white", padding: 8, border: "none", borderRadius: 4 }}>
+              Crea attivazione
+            </button>
+          </form>
+        </section>
+
+        <h3>Mezzi ({mezzi.length})</h3>
         <ul>
           {mezzi.map((m) => (
             <li key={m.id}>
@@ -106,12 +210,33 @@ export default function App() {
         </ul>
 
         <h3>Interventi</h3>
-        <ul>
+        <ul style={{ listStyle: "none", padding: 0 }}>
           {interventi.map((i) => (
-            <li key={i.id}>
+            <li key={i.id} style={{ marginBottom: 12, padding: 8, border: "1px solid #eee", borderRadius: 6 }}>
               <strong>{i.indirizzo}</strong> — {i.stato}
               <br />
               <small>{new Date(i.creato_il).toLocaleString("it-IT")}</small>
+
+              {i.stato === "in_attesa" && (
+                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  <select
+                    value={mezzoScelto[i.id] ?? ""}
+                    onChange={(e) => setMezzoScelto((prev) => ({ ...prev, [i.id]: e.target.value }))}
+                  >
+                    <option value="">Scegli mezzo...</option>
+                    {mezziDisponibili.map((m) => (
+                      <option key={m.id} value={m.id}>{m.nome}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => assegna(i.id)}>Assegna e attiva</button>
+                </div>
+              )}
+
+              {(i.stato === "assegnato" || i.stato === "in_corso") && (
+                <div style={{ marginTop: 8 }}>
+                  <button onClick={() => chiudi(i.id)}>Chiudi intervento</button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -119,3 +244,4 @@ export default function App() {
     </div>
   );
 }
+Fatto
