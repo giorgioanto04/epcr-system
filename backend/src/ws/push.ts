@@ -4,19 +4,29 @@ import fs from "fs";
 let admin: typeof import("firebase-admin") | null = null;
 let initialized = false;
 
-/**
- * Inizializza Firebase Admin SDK solo se il file di credenziali esiste.
- * In fase di sviluppo iniziale, se manca, l'invio push viene semplicemente
- * loggato in console senza bloccare il resto del sistema.
- */
 async function ensureInit() {
   if (initialized) return;
+
+  const credJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? "";
   const credPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? "";
-  if (credPath && fs.existsSync(credPath)) {
+
+  let credentials: object | null = null;
+
+  if (credJson) {
+    try {
+      credentials = JSON.parse(credJson);
+    } catch (e) {
+      console.error("[push] FIREBASE_SERVICE_ACCOUNT_JSON non è un JSON valido:", e);
+    }
+  } else if (credPath && fs.existsSync(credPath)) {
+    credentials = JSON.parse(fs.readFileSync(credPath, "utf-8"));
+  }
+
+  if (credentials) {
     admin = (await import("firebase-admin")).default;
     if (!admin.apps.length) {
       admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(fs.readFileSync(credPath, "utf-8"))),
+        credential: admin.credential.cert(credentials as any),
       });
     }
   } else {
@@ -33,10 +43,6 @@ interface AttivazionePayload {
   tipologia?: string;
 }
 
-/**
- * Invia una notifica push "critica": priorità massima, suono ad alto volume,
- * pensata per svegliare l'app anche a schermo spento o in background.
- */
 export async function inviaNotificaAttivazione(pushToken: string, payload: AttivazionePayload) {
   await ensureInit();
 
@@ -59,7 +65,7 @@ export async function inviaNotificaAttivazione(pushToken: string, payload: Attiv
     android: {
       priority: "high" as const,
       notification: {
-        channelId: "attivazioni-critiche", // canale ad alta priorità configurato lato app
+        channelId: "attivazioni-critiche",
         sound: "attivazione_alta_priorita",
         visibility: "public" as const,
       },
