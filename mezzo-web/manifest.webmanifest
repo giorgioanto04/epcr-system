@@ -1,0 +1,9 @@
+{
+  "name": "ePCR - Postazione Mezzo",
+  "short_name": "ePCR Mezzo",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "background_color": "#1a1a1a",
+  "theme_color": "#c62828",
+  "orientation": "portrait"
+}
