@@ -165,7 +165,7 @@
   // oppure passalo come ?api=https://... nella URL della pagina.
   // ---------------------------------------------------------------
   const params = new URLSearchParams(location.search);
-  const API_URL = params.get("api") || localStorage.getItem("epcr_api_url") || "http://localhost:3000";
+  const API_URL = params.get("api") || localStorage.getItem("epcr_api_url") || "https://epcr-system.onrender.com";
   localStorage.setItem("epcr_api_url", API_URL);
 
   const STORAGE_KEY = "epcr_mezzo_selezionato";
