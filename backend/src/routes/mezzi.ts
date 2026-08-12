@@ -12,9 +12,15 @@ export async function mezziRoutes(app: FastifyInstance) {
           WHERE s.intervento_id = i.id AND s.mezzo_id = m.id
           ORDER BY s.registrato_il DESC LIMIT 1) AS ultimo_stato
       FROM mezzi m
-      LEFT JOIN intervento_mezzi im ON im.mezzo_id = m.id
-      LEFT JOIN interventi i ON i.id = im.intervento_id AND i.stato NOT IN ('concluso','annullato')
-      ORDER BY m.nome
+      LEFT JOIN LATERAL (
+        SELECT im.intervento_id
+        FROM intervento_mezzi im
+        JOIN interventi ia ON ia.id=im.intervento_id
+        WHERE im.mezzo_id=m.id AND ia.stato NOT IN ('concluso','annullato')
+        ORDER BY ia.creato_il DESC LIMIT 1
+      ) im ON true
+      LEFT JOIN interventi i ON i.id = im.intervento_id
+      ORDER BY m.nome, m.id
     `);
     // Un mezzo è riassegnabile a una nuova missione solo se libero, oppure se
     // sulla missione attiva corrente è già in rientro / libero in ospedale / disponibile.
@@ -27,6 +33,11 @@ export async function mezziRoutes(app: FastifyInstance) {
   app.post("/mezzi", async (req, reply) => {
     const { nome, targa } = req.body as { nome: string; targa?: string };
     if (!nome?.trim()) return reply.code(400).send({ errore: "Nome obbligatorio" });
+    const duplicato = await pool.query(
+      `SELECT id FROM mezzi WHERE lower(trim(nome))=lower(trim($1)) AND COALESCE(lower(trim(targa)), '')=COALESCE(lower(trim($2)), '') LIMIT 1`,
+      [nome.trim(), targa?.trim() || null]
+    );
+    if (duplicato.rows.length) return reply.code(409).send({ errore: "Esiste già un mezzo con lo stesso nome e la stessa targa" });
     const { rows } = await pool.query(
       "INSERT INTO mezzi (nome, targa) VALUES ($1, $2) RETURNING *",
       [nome.trim(), targa?.trim() || null]

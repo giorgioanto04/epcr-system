@@ -16,3 +16,21 @@
 .poiRow .poiMain small{display:block;font-size:10px;color:#91a1b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .secondary.placing{background:#1d4ed8;border-color:#3b82f6;color:#fff}
 @media(max-width:850px){.grid4{grid-template-columns:1fr 1fr}}
+/* IRIS v2 - miglioramenti CO */
+.workspace{grid-template-columns:var(--left-width,280px) minmax(420px,1fr) 390px}
+.leftResizeHandle{width:7px;background:#17263b;cursor:col-resize;position:relative;z-index:20;margin-left:-3px;margin-right:-4px}
+.leftResizeHandle:hover,.leftResizeHandle:active{background:#2563eb}
+.left{overflow-x:hidden}
+.fleetMain b{white-space:nowrap;overflow:visible;text-overflow:clip}
+.missionTimes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.missionTimes label{display:grid;gap:4px;font-size:10px;color:#657286;font-weight:800}
+.missionTimes input{width:100%;border:1px solid #d7dee8;background:#fbfcfe;border-radius:7px;padding:8px;outline:none}
+.editableTimeline{grid-template-columns:175px minmax(140px,1fr) 120px 70px;align-items:center}
+.editableTimeline input{width:100%;border:1px solid #d7dee8;background:#fbfcfe;border-radius:7px;padding:6px;font-size:10px}
+.deleteEvent{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;border-radius:7px;padding:6px 7px;font-size:10px;font-weight:800}
+.historyHead>div small{display:block;color:#7b8798;font-size:10px;margin-top:2px}
+@media(max-width:1100px){.workspace{grid-template-columns:var(--left-width,235px) minmax(360px,1fr) 330px}.missionTimes{grid-template-columns:1fr 1fr}.editableTimeline{grid-template-columns:1fr 1fr}}
+@media(max-width:850px){.workspace{grid-template-columns:1fr}.leftResizeHandle{display:none}.missionTimes{grid-template-columns:1fr 1fr}.editableTimeline{grid-template-columns:1fr}}
+.workspace{grid-template-columns:var(--left-width,280px) 7px minmax(420px,1fr) 390px}
+@media(max-width:1100px){.workspace{grid-template-columns:var(--left-width,235px) 7px minmax(360px,1fr) 330px}}
+@media(max-width:850px){.workspace{grid-template-columns:1fr}.leftResizeHandle{display:none}}

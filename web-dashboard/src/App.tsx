@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { io, Socket } from "socket.io-client";
 import "leaflet/dist/leaflet.css";
@@ -44,6 +44,8 @@ function Radio({value,onChange,options}:{value:string;onChange:(v:string)=>void;
 }
 function inArr(arr:string[]|undefined,v:string){return !!arr&&arr.includes(v);}
 function toggleArr(arr:string[]|undefined,v:string){const a=arr||[];return a.includes(v)?a.filter(x=>x!==v):[...a,v];}
+function toLocalInput(value?:string|null){if(!value)return "";const d=new Date(value);if(Number.isNaN(d.getTime()))return "";const pad=(n:number)=>String(n).padStart(2,"0");return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+function toIso(value:string){return value?new Date(value).toISOString():null;}
 
 const COSCIENZA_OPZ:[string,string][]=[["sveglio","Sveglio (A)"],["reag_chiamata","Reagisce a chiamata (V)"],["reag_dolore","Reagisce a dolore (P)"],["incosciente","Incosciente (U)"]];
 const RESPIRO_OPZ:[string,string][]=[["normale","Normale"],["difficoltoso","Difficoltoso"],["assente","Assente"]];
@@ -76,6 +78,9 @@ export default function App(){
   const [sheet,setSheet]=useState<any>({});
   const [evalIndex,setEvalIndex]=useState(0);
   const [newBorn,setNewBorn]=useState("");
+  const [leftWidth,setLeftWidth]=useState(()=>{try{return Number(localStorage.getItem("iris_co_left_width"))||280}catch{return 280}});
+  const [missionTimes,setMissionTimes]=useState({creato_il:"",ora_assegnazione:"",ora_presa_in_carico:"",ora_arrivo:"",ora_rientro:""});
+  const draggingLeft=useRef(false);
   const audioRef=useRef<HTMLAudioElement|null>(null);
 
   const refresh=async()=>{
@@ -128,10 +133,14 @@ export default function App(){
   };
   const savePoi=async(e:any)=>{e.preventDefault();try{if(poiForm.id)await save(`/poi/${poiForm.id}`,"PATCH",{etichetta:poiForm.etichetta,note:poiForm.note});else await save("/poi","POST",poiForm);setModal(null);refresh()}catch(e:any){setError(e.message)}};
   const deletePoi=async(id:string)=>{if(!confirm("Rimuovere questo punto dalla mappa?"))return;try{await save(`/poi/${id}`,"DELETE",{});refresh()}catch(e:any){setError(e.message)}};
-  const openMission=async(id:string)=>{try{const m=await fetch(`${API_URL}/interventi/${id}`).then(r=>r.json());if(m.errore)throw new Error(m.errore);setSelectedMissione(m);setSheet(m.scheda||{});setNewBorn(m.scheda?.dataNascita||"")}catch(e:any){setError(e.message)}};
+  const openMission=async(id:string)=>{try{const m=await fetch(`${API_URL}/interventi/${id}`).then(r=>r.json());if(m.errore)throw new Error(m.errore);setSelectedMissione(m);setSheet(m.scheda||{});setNewBorn(m.scheda?.dataNascita||"");setMissionTimes({creato_il:toLocalInput(m.creato_il),ora_assegnazione:toLocalInput(m.ora_assegnazione),ora_presa_in_carico:toLocalInput(m.ora_presa_in_carico),ora_arrivo:toLocalInput(m.ora_arrivo),ora_rientro:toLocalInput(m.ora_rientro)});}catch(e:any){setError(e.message)}};
+  const saveMissionTimes=async()=>{if(!selectedMissione)return;try{const m=await save(`/interventi/${selectedMissione.id}/orari`,"PATCH",{creato_il:toIso(missionTimes.creato_il),ora_assegnazione:toIso(missionTimes.ora_assegnazione),ora_presa_in_carico:toIso(missionTimes.ora_presa_in_carico),ora_arrivo:toIso(missionTimes.ora_arrivo),ora_rientro:toIso(missionTimes.ora_rientro)});setSelectedMissione(m);setMissionTimes({creato_il:toLocalInput(m.creato_il),ora_assegnazione:toLocalInput(m.ora_assegnazione),ora_presa_in_carico:toLocalInput(m.ora_presa_in_carico),ora_arrivo:toLocalInput(m.ora_arrivo),ora_rientro:toLocalInput(m.ora_rientro)});refresh()}catch(e:any){setError(e.message)}};
+  const updateEventTime=async(eventId:string,value:string)=>{if(!selectedMissione||!value)return;try{const m=await save(`/interventi/${selectedMissione.id}/cronologia/${eventId}`,"PATCH",{registrato_il:toIso(value)});setSelectedMissione(m);setMissionTimes({creato_il:toLocalInput(m.creato_il),ora_assegnazione:toLocalInput(m.ora_assegnazione),ora_presa_in_carico:toLocalInput(m.ora_presa_in_carico),ora_arrivo:toLocalInput(m.ora_arrivo),ora_rientro:toLocalInput(m.ora_rientro)});refresh()}catch(e:any){setError(e.message)}};
+  const deleteEvent=async(eventId:string)=>{if(!selectedMissione||!confirm("Eliminare questo evento dalla cronologia? L'azione non è reversibile."))return;try{const m=await save(`/interventi/${selectedMissione.id}/cronologia/${eventId}`,"DELETE",{});setSelectedMissione(m);setMissionTimes({creato_il:toLocalInput(m.creato_il),ora_assegnazione:toLocalInput(m.ora_assegnazione),ora_presa_in_carico:toLocalInput(m.ora_presa_in_carico),ora_arrivo:toLocalInput(m.ora_arrivo),ora_rientro:toLocalInput(m.ora_rientro)});refresh()}catch(e:any){setError(e.message)}};
   const updateSheet=(k:string,v:any)=>setSheet((s:any)=>({...s,[k]:v}));
   const saveSheet=async()=>{if(!selectedMissione)return;try{await save(`/interventi/${selectedMissione.id}/scheda`,"PATCH",{scheda:{...sheet,dataNascita:newBorn},ospedale:selectedMissione.ospedale||null,priorita:selectedMissione.priorita});await openMission(selectedMissione.id);refresh()}catch(e:any){setError(e.message)}};
   const age=newBorn?Math.max(0,new Date().getFullYear()-new Date(newBorn).getFullYear()-((new Date().getMonth()<new Date(newBorn).getMonth()||new Date().getMonth()===new Date(newBorn).getMonth()&&new Date().getDate()<new Date(newBorn).getDate())?1:0)):"";
+  useEffect(()=>{const move=(e:PointerEvent)=>{if(!draggingLeft.current)return;const next=Math.max(220,Math.min(460,e.clientX));setLeftWidth(next);localStorage.setItem("iris_co_left_width",String(next));};const up=()=>{draggingLeft.current=false;document.body.style.cursor="";document.body.style.userSelect="";};window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up)}},[]);
 
   const downloadMission=()=>{
     if(!selectedMissione)return;
@@ -205,7 +214,7 @@ export default function App(){
     <audio ref={audioRef} src="/glong.wav" preload="auto" />
     <header className="topbar"><div><div className="brand">IRIS <span>v2</span></div><div className="sub">Centrale Operativa · gestione missioni, mezzi e schede</div></div><div className="topActions"><span className="live">● REALTIME</span><label>Giornata <input type="date" value={giorno} onChange={e=>setGiorno(e.target.value)}/></label><button onClick={()=>audioRef.current?.play().catch(()=>setError("Il browser richiede un'interazione per attivare l'audio."))}>🔔 Test glong</button></div></header>
     {error&&<div className="error">{error}<button onClick={()=>setError("")}>×</button></div>}
-    <div className="workspace">
+    <div className="workspace" style={{"--left-width":`${leftWidth}px`} as CSSProperties}>
       <aside className="left">
         <button className="newMission" onClick={()=>setModal("nuova")}>＋ Nuova missione</button>
         <div className="panelTitle">STATO MEZZI <span>{mezzi.length}</span></div>
@@ -227,6 +236,7 @@ export default function App(){
           {!poi.length&&<div className="empty">Nessun punto sulla mappa.</div>}
         </div>
       </aside>
+      <div className="leftResizeHandle" title="Trascina per allargare o restringere la barra" onPointerDown={e=>{e.preventDefault();draggingLeft.current=true;document.body.style.cursor="col-resize";document.body.style.userSelect="none"}} />
 
       <main className="mapPanel">
         <MapContainer center={[45.4642,9.19]} zoom={12} style={{height:"100%",width:"100%"}}>
@@ -257,6 +267,7 @@ export default function App(){
       <section className="drawer">
         <div className="drawerHead"><div><span className={`prio ${selectedMissione.priorita}`}>{selectedMissione.priorita.toUpperCase()}</span><b>{selectedMissione.missione_numero}</b><h2>{selectedMissione.indirizzo}</h2><small>{selectedMissione.tipologia||"Missione"} · {STATUS_LABEL[selectedMissione.stato]||selectedMissione.stato}</small></div><div className="drawerActions"><button onClick={downloadMission}>⇩ Scheda</button><button className="danger" style={{marginTop:0}} onClick={()=>deleteMission(selectedMissione.id)}>Elimina</button>{!["concluso","annullato"].includes(selectedMissione.stato)&&<button className="closeMission" onClick={()=>closeMission(selectedMissione.id)}>✓ Chiudi missione</button>}<button onClick={()=>setSelectedMissione(null)}>×</button></div></div>
         <div className="drawerBody">
+          <section className="detailCard"><h3>Orari missione</h3><div className="missionTimes"><label>Attivazione / creazione<input type="datetime-local" value={missionTimes.creato_il} onChange={e=>setMissionTimes({...missionTimes,creato_il:e.target.value})}/></label><label>Assegnazione<input type="datetime-local" value={missionTimes.ora_assegnazione} onChange={e=>setMissionTimes({...missionTimes,ora_assegnazione:e.target.value})}/></label><label>Presa in carico<input type="datetime-local" value={missionTimes.ora_presa_in_carico} onChange={e=>setMissionTimes({...missionTimes,ora_presa_in_carico:e.target.value})}/></label><label>Arrivo sul posto<input type="datetime-local" value={missionTimes.ora_arrivo} onChange={e=>setMissionTimes({...missionTimes,ora_arrivo:e.target.value})}/></label><label>Rientro<input type="datetime-local" value={missionTimes.ora_rientro} onChange={e=>setMissionTimes({...missionTimes,ora_rientro:e.target.value})}/></label></div><button className="save" onClick={saveMissionTimes}>Salva orari</button></section>
           <section className="detailCard"><h3>Stati dei mezzi</h3>{(selectedMissione.mezzi||[]).length?(selectedMissione.mezzi||[]).map(m=><div className="unitBlock" key={m.id}><div className="unitHead"><b>{m.nome}</b><span>{STATUS_LABEL[m.stato]||m.stato} <button className="removeUnit" onClick={()=>removeAssignedMezzo(selectedMissione.id,m.id)}>Rimuovi</button></span></div><div className="stateGrid">{STATI.map(st=><button key={st} className={(selectedMissione.cronologia||[]).slice().reverse().find(c=>c.mezzo_id===m.id)?.stato===st?"on":""} onClick={()=>setState(selectedMissione.id,m.id,st)}>{LABELS[st]}</button>)}</div></div>):<div className="empty">Nessun mezzo associato.</div>}
           <h3>Assegna un altro mezzo</h3><div className="chips">{mezzi.filter(m=>!(selectedMissione.mezzi||[]).some(x=>x.id===m.id)).map(m=><button key={m.id} onClick={()=>assign(selectedMissione.id,m.id)} disabled={m.stato==="fuori_servizio"||m.assegnabile===false} title={m.assegnabile===false?"Mezzo impegnato su un'altra missione: assegnabile solo se in rientro, libero in ospedale o disponibile":""}>{m.nome} · {m.assegnabile===false?`Impegnato (${LABELS[m.ultimo_stato||""]||"in missione"})`:STATUS_LABEL[m.stato]}</button>)}</div></section>
           <section className="detailCard"><h3>Relazione di soccorso <small className="modLabel">Mod. 16</small></h3>
@@ -323,7 +334,7 @@ export default function App(){
 
             <button className="save full" onClick={saveSheet}>Salva scheda</button>
           </section>
-          <section className="detailCard"><div className="historyHead"><h3>Brogliaccio missione</h3><button onClick={downloadMission}>⇩ Scarica</button></div>{(selectedMissione.cronologia||[]).length?<div className="timeline">{selectedMissione.cronologia!.slice().reverse().map(c=><div className="timelineRow" key={c.id}><time>{new Date(c.registrato_il).toLocaleString("it-IT")}</time><b>{LABELS[c.stato]||c.stato}</b><span>{(selectedMissione.mezzi||[]).find(z=>z.id===c.mezzo_id)?.nome||"Sistema"}</span></div>)}</div>:<div className="empty">Nessun evento registrato.</div>}</section>
+          <section className="detailCard"><div className="historyHead"><div><h3>Brogliaccio missione</h3><small>Gli orari possono essere corretti dalla CO; gli eventi errati possono essere eliminati.</small></div><button onClick={downloadMission}>⇩ Scarica</button></div>{(selectedMissione.cronologia||[]).length?<div className="timeline">{selectedMissione.cronologia!.slice().sort((a,b)=>new Date(b.registrato_il).getTime()-new Date(a.registrato_il).getTime()).map(c=><div className="timelineRow editableTimeline" key={c.id}><input type="datetime-local" value={toLocalInput(c.registrato_il)} onChange={e=>updateEventTime(c.id,e.target.value)}/><b>{LABELS[c.stato]||c.stato}</b><span>{(selectedMissione.mezzi||[]).find(z=>z.id===c.mezzo_id)?.nome||"Sistema"}</span><button className="deleteEvent" title="Elimina evento" onClick={()=>deleteEvent(c.id)}>Elimina</button></div>)}</div>:<div className="empty">Nessun evento registrato.</div>}</section>
         </div>
       </section>
     </div>}

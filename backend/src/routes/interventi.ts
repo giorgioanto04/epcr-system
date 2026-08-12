@@ -8,12 +8,39 @@ const STATI_MISSIONE = ["attivazione","partenza","arrivo_sul_posto","paziente_vi
 
 async function missioneCompleta(id: string) {
   const { rows } = await pool.query(`
-    SELECT i.*, COALESCE(json_agg(json_build_object('id',m.id,'nome',m.nome,'targa',m.targa,'stato',m.stato)) FILTER (WHERE m.id IS NOT NULL),'[]') AS mezzi
+    SELECT i.*, COALESCE(json_agg(json_build_object(
+      'id',m.id,
+      'nome',m.nome,
+      'targa',m.targa,
+      'stato',m.stato,
+      'ultimo_stato',(SELECT s.stato FROM stati_intervento s WHERE s.intervento_id=i.id AND s.mezzo_id=m.id ORDER BY s.registrato_il DESC LIMIT 1)
+    )) FILTER (WHERE m.id IS NOT NULL),'[]') AS mezzi
     FROM interventi i
     LEFT JOIN intervento_mezzi im ON im.intervento_id=i.id
     LEFT JOIN mezzi m ON m.id=im.mezzo_id
     WHERE i.id=$1 GROUP BY i.id`, [id]);
   return rows[0];
+}
+
+async function aggiornaStatoMissioneDaCronologia(interventoId: string) {
+  const { rows: links } = await pool.query(
+    `SELECT im.mezzo_id, (SELECT s.stato FROM stati_intervento s WHERE s.intervento_id=$1 AND s.mezzo_id=im.mezzo_id ORDER BY s.registrato_il DESC LIMIT 1) AS ultimo_stato
+     FROM intervento_mezzi im WHERE im.intervento_id=$1`, [interventoId]
+  );
+  if (!links.length) {
+    await pool.query(`UPDATE interventi SET stato='in_attesa' WHERE id=$1 AND stato NOT IN ('concluso','annullato')`, [interventoId]);
+    return;
+  }
+  for (const link of links) {
+    const stato = link.ultimo_stato || null;
+    const mezzoStato = !stato || stato === 'disponibile' ? 'disponibile' : 'impegnato';
+    await pool.query(`UPDATE mezzi SET stato=$1 WHERE id=$2`, [mezzoStato, link.mezzo_id]);
+  }
+  const nessunEvento = links.every((x:any) => !x.ultimo_stato);
+  const tuttiDisponibili = links.every((x:any) => x.ultimo_stato === 'disponibile');
+  const qualcunoInCorso = links.some((x:any) => ['partenza','arrivo_sul_posto','paziente_visto','partenza_ospedale','arrivo_ospedale','libero_in_ospedale','rientro'].includes(x.ultimo_stato));
+  const nuovoStato = nessunEvento ? 'assegnato' : tuttiDisponibili ? 'concluso' : qualcunoInCorso ? 'in_corso' : 'assegnato';
+  await pool.query(`UPDATE interventi SET stato=$1 WHERE id=$2 AND stato NOT IN ('annullato')`, [nuovoStato, interventoId]);
 }
 
 export async function interventiRoutes(app: FastifyInstance) {
@@ -67,8 +94,12 @@ export async function interventiRoutes(app: FastifyInstance) {
   });
 
   app.delete("/interventi/:id", async (req, reply) => {
-    const { id }=req.params as {id:string}; const { rows }=await pool.query("DELETE FROM interventi WHERE id=$1 RETURNING id",[id]);
-    if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"}); getIO().to("centrale").emit("intervento_eliminato",{id}); return {ok:true};
+    const { id }=req.params as {id:string};
+    const linked=await pool.query("SELECT mezzo_id FROM intervento_mezzi WHERE intervento_id=$1",[id]);
+    const { rows }=await pool.query("DELETE FROM interventi WHERE id=$1 RETURNING id",[id]);
+    if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"});
+    for(const row of linked.rows) getIO().to(`mezzo:${row.mezzo_id}`).emit("missione_chiusa",{interventoId:id,mezzoId:row.mezzo_id,eliminata:true});
+    getIO().to("centrale").emit("intervento_eliminato",{id}); return {ok:true};
   });
 
   // Un mezzo può essere impegnato su una sola missione attiva per volta: è
@@ -103,7 +134,8 @@ export async function interventiRoutes(app: FastifyInstance) {
     if(mezzo.rows[0].stato==='fuori_servizio')return reply.code(409).send({errore:"Il mezzo è fuori servizio e non può essere assegnato"});
     const intervento=await pool.query("SELECT * FROM interventi WHERE id=$1",[id]); if(!intervento.rows.length)return reply.code(404).send({errore:"Missione non trovata"});
     const giaAssegnato=await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2",[id,mezzoId]);
-    if(!giaAssegnato.rows.length && !(await mezzoAssegnabile(mezzoId))) {
+    if(giaAssegnato.rows.length) return reply.code(409).send({errore:"Il mezzo è già associato a questa missione"});
+    if(!(await mezzoAssegnabile(mezzoId))) {
       return reply.code(409).send({errore:"Il mezzo è già impegnato su un'altra missione: può essere riassegnato solo se in rientro, libero in ospedale o disponibile"});
     }
     await pool.query(`INSERT INTO intervento_mezzi(intervento_id,mezzo_id) VALUES($1,$2) ON CONFLICT DO NOTHING`,[id,mezzoId]);
@@ -185,5 +217,53 @@ export async function interventiRoutes(app: FastifyInstance) {
     return m;
   });
 
-  app.post("/interventi/:id/chiudi", async(req,reply)=>{const{id}=req.params as{id:string}; const{rows}=await pool.query("UPDATE interventi SET stato='concluso',ora_rientro=now() WHERE id=$1 RETURNING *",[id]); if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"}); await pool.query("UPDATE mezzi SET stato='disponibile' WHERE id IN (SELECT mezzo_id FROM intervento_mezzi WHERE intervento_id=$1)",[id]); const m=await missioneCompleta(id); getIO().to("centrale").emit("intervento_concluso",m); return m;});
+  app.patch("/interventi/:id/orari", async(req,reply)=>{
+    const {id}=req.params as {id:string};
+    const b=req.body as {creato_il?:string|null;ora_assegnazione?:string|null;ora_presa_in_carico?:string|null;ora_arrivo?:string|null;ora_rientro?:string|null};
+    const {rows}=await pool.query(`UPDATE interventi SET
+      creato_il=COALESCE($1,creato_il),
+      ora_assegnazione=$2,
+      ora_presa_in_carico=$3,
+      ora_arrivo=$4,
+      ora_rientro=$5
+      WHERE id=$6 RETURNING *`,[b.creato_il||null,b.ora_assegnazione||null,b.ora_presa_in_carico||null,b.ora_arrivo||null,b.ora_rientro||null,id]);
+    if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"});
+    const m=await missioneCompleta(id); getIO().to("centrale").emit("missione_aggiornata",m);
+    return m;
+  });
+
+  app.patch("/interventi/:id/cronologia/:eventId", async(req,reply)=>{
+    const {id,eventId}=req.params as {id:string;eventId:string};
+    const {registrato_il}=req.body as {registrato_il:string};
+    if(!registrato_il || Number.isNaN(Date.parse(registrato_il))) return reply.code(400).send({errore:"Data/ora non valida"});
+    const {rows}=await pool.query(`UPDATE stati_intervento SET registrato_il=$1 WHERE id=$2 AND intervento_id=$3 RETURNING *`,[registrato_il,eventId,id]);
+    if(!rows.length)return reply.code(404).send({errore:"Evento di cronologia non trovato"});
+    await aggiornaStatoMissioneDaCronologia(id);
+    const m=await missioneCompleta(id); getIO().to("centrale").emit("cronologia_modificata",{missione:m,eventId});
+    if(rows[0].mezzo_id)getIO().to(`mezzo:${rows[0].mezzo_id}`).emit("cronologia_modificata",{missione:m,eventId});
+    return m;
+  });
+
+  app.delete("/interventi/:id/cronologia/:eventId", async(req,reply)=>{
+    const {id,eventId}=req.params as {id:string;eventId:string};
+    const existing=await pool.query(`SELECT * FROM stati_intervento WHERE id=$1 AND intervento_id=$2`,[eventId,id]);
+    if(!existing.rows.length)return reply.code(404).send({errore:"Evento di cronologia non trovato"});
+    await pool.query(`DELETE FROM stati_intervento WHERE id=$1 AND intervento_id=$2`,[eventId,id]);
+    await aggiornaStatoMissioneDaCronologia(id);
+    const m=await missioneCompleta(id); getIO().to("centrale").emit("cronologia_modificata",{missione:m,eventId,eliminato:true});
+    if(existing.rows[0].mezzo_id)getIO().to(`mezzo:${existing.rows[0].mezzo_id}`).emit("cronologia_modificata",{missione:m,eventId,eliminato:true});
+    return m;
+  });
+
+  app.post("/interventi/:id/chiudi", async(req,reply)=>{
+    const{id}=req.params as{id:string};
+    const {rows}=await pool.query("UPDATE interventi SET stato='concluso',ora_rientro=COALESCE(ora_rientro,now()) WHERE id=$1 RETURNING *",[id]);
+    if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"});
+    const linked=await pool.query("SELECT mezzo_id FROM intervento_mezzi WHERE intervento_id=$1",[id]);
+    await pool.query("UPDATE mezzi SET stato='disponibile' WHERE id IN (SELECT mezzo_id FROM intervento_mezzi WHERE intervento_id=$1)",[id]);
+    const m=await missioneCompleta(id);
+    for(const row of linked.rows) getIO().to(`mezzo:${row.mezzo_id}`).emit("missione_chiusa",{interventoId:id,mezzoId:row.mezzo_id,missione:m});
+    getIO().to("centrale").emit("intervento_concluso",m);
+    return m;
+  });
 }

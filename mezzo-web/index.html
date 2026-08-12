@@ -27,7 +27,9 @@
     align-items: center;
     justify-content: space-between;
   }
-  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; line-height: 1.1; }
+  .header-title { display:flex; flex-direction:column; gap:5px; align-items:flex-start; }
+  .header-state { font-size:11px; font-weight:800; color:#fff; background:#333; border-radius:999px; padding:4px 9px; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
   #stato-connessione {
     font-size: 12px;
     padding: 3px 9px;
@@ -152,7 +154,7 @@
 <body>
 
 <header>
-  <h1>IRIS v2 &middot; Postazione Mezzo <span id="stato-mezzo-header" class="status-small">Disponibile</span></h1>
+  <div class="header-title"><h1>IRIS v2 &middot; Postazione Mezzo</h1><span id="stato-mezzo-header" class="header-state">Disponibile</span></div>
   <span id="stato-connessione">connessione...</span>
 </header>
 
@@ -261,6 +263,8 @@
   const API_URL = params.get("api") || "https://epcr-system.onrender.com";
   localStorage.setItem("iris_api_url", API_URL);
   const STORAGE_KEY = "iris_mezzo_selezionato";
+  const MEZZO_QUERY_KEY = "mezzo";
+  const mezzoDaLink = params.get(MEZZO_QUERY_KEY);
 
   const elSelezione = document.getElementById("schermata-selezione");
   const elAttesa = document.getElementById("schermata-attesa");
@@ -366,7 +370,9 @@
   }
 
   async function selezionaMezzo(mezzo){
-    await preparaAudio();mezzoSelezionato=mezzo;localStorage.setItem(STORAGE_KEY,JSON.stringify(mezzo));elNomeMezzoCorrente.textContent=mezzo.nome;setHeaderState(mezzo.ultimo_stato||mezzo.stato);connettiSocket();await caricaMissioneAttiva();
+    await preparaAudio();mezzoSelezionato=mezzo;localStorage.setItem(STORAGE_KEY,JSON.stringify(mezzo));
+    const url=new URL(location.href);url.searchParams.set(MEZZO_QUERY_KEY,mezzo.id);history.replaceState({},"",url.toString());
+    elNomeMezzoCorrente.textContent=mezzo.nome;setHeaderState(mezzo.ultimo_stato||mezzo.stato);connettiSocket();await caricaMissioneAttiva();
   }
   async function caricaMissioneAttiva(){
     try{const r=await fetch(`${API_URL}/interventi/mezzo/${mezzoSelezionato.id}/attiva`);const m=await r.json();if(m){missioneCorrente=m;sheet={...(m.scheda||{})};renderMissione();}else vaiA("attesa");}catch(e){vaiA("attesa");}
@@ -410,15 +416,28 @@
     socket.on("stato_missione",d=>{const id=d.interventoId||d.missione?.id;if(missioneCorrente&&id===missioneCorrente.id){caricaMissioneAttiva();}});
     socket.on("missione_aggiornata",d=>{if(missioneCorrente&&d.id===missioneCorrente.id){caricaMissioneAttiva();}});
     socket.on("missione_rimossa",d=>{if(missioneCorrente&&d.interventoId===missioneCorrente.id){missioneCorrente=null;sheet={};vaiA("attesa");}});
+    socket.on("missione_chiusa",d=>{if(d.mezzoId===mezzoSelezionato?.id && (!missioneCorrente || d.interventoId===missioneCorrente.id)){stopAlarm();missioneCorrente=null;interventoCorrente=null;sheet={};setHeaderState("disponibile");vaiA("attesa");}});
   }
 
   document.getElementById("conferma-btn").addEventListener("click",async()=>{if(!interventoCorrente)return;stopAlarm();if(navigator.vibrate)navigator.vibrate(0);await caricaMissioneAttiva();interventoCorrente=null;});
   document.getElementById("abilita-audio").addEventListener("click",preparaAudio);
   document.getElementById("salva-scheda").addEventListener("click",salvaScheda);
-  document.getElementById("cambia-mezzo").addEventListener("click",()=>{localStorage.removeItem(STORAGE_KEY);if(socket)socket.disconnect();mezzoSelezionato=null;missioneCorrente=null;vaiA("selezione");caricaMezzi();});
+  document.getElementById("cambia-mezzo").addEventListener("click",()=>{localStorage.removeItem(STORAGE_KEY);if(socket)socket.disconnect();mezzoSelezionato=null;missioneCorrente=null;const url=new URL(location.href);url.searchParams.delete(MEZZO_QUERY_KEY);history.replaceState({},"",url.toString());vaiA("selezione");caricaMezzi();});
 
-  const salvato=localStorage.getItem(STORAGE_KEY);
-  if(salvato){try{selezionaMezzo(JSON.parse(salvato));}catch{vaiA("selezione");caricaMezzi();}}else{vaiA("selezione");caricaMezzi();}
+  async function avvio(){
+    if(mezzoDaLink){
+      try{
+        const r=await fetch(`${API_URL}/mezzi`);
+        const mezzi=await r.json();
+        const scelto=mezzi.find(m=>m.id===mezzoDaLink);
+        if(scelto){await selezionaMezzo(scelto);return;}
+      }catch{}
+    }
+    const salvato=localStorage.getItem(STORAGE_KEY);
+    if(salvato){try{selezionaMezzo(JSON.parse(salvato));return;}catch{}}
+    vaiA("selezione");caricaMezzi();
+  }
+  avvio();
 })();
 </script>
 </body>
