@@ -3,3 +3,17 @@
 
 /* IRIS v2 - identità visiva istituzionale */
 body{font-family:Arial,sans-serif;letter-spacing:.01em}.brand,.topbar h1,h1,h2,h3{font-weight:800;letter-spacing:.01em}.panelTitle,.sectionTitle,.detailCard h3,.sheet h4,.assignTitle{text-transform:uppercase;letter-spacing:.08em}.primary,.save,.danger,.brogliaccioFab,.brogliaccioBtn{font-weight:800;letter-spacing:.02em}.missionCard strong,.fleetMain b,.drawerHead h2,.modalHead b{font-weight:800}.mutedSmall,.hint,.sectionHead small{letter-spacing:.02em}
+
+/* IRIS - tipografia istituzionale */
+:root{font-family:"Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:400}
+body,#root{font-family:"Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:400;letter-spacing:0}
+button,input,textarea,select{font-family:inherit}
+.brand{font-weight:600;letter-spacing:-.2px}
+.brand span{font-weight:400}
+.connection{font-weight:400}
+h1,h2,h3,h4,h5,h6{font-weight:500;letter-spacing:0}
+.sectionHead h2,.sectionHead h3{font-weight:500}
+.primary,.save,.danger,.brogliaccioFab,.brogliaccioBtn{font-weight:500;letter-spacing:0}
+.priority,.assignTitle,.prio,.fieldLabel,.missionTimes label,.brogliaccioTimes label{font-weight:500}
+.missionCard strong,.fleetMain b,.drawerHead h2,.modalHead b{font-weight:500}
+.stateGrid button.selected,.flags button,.deleteEvent,.brogliaccioHeader button,.brogliaccioMissionHead button{font-weight:500}
