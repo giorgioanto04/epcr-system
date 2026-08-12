@@ -92,9 +92,14 @@
     padding: 24px;
     gap: 16px;
     z-index: 100;
-    animation: flash 1s infinite;
+    animation: flash-red 1s infinite;
   }
-  @keyframes flash { 0%,100% { background:#c62828; } 50% { background:#8e0000; } }
+  @keyframes flash-red { 0%,100% { background:#c62828; } 50% { background:#8e0000; } }
+  @keyframes flash-green { 0%,100% { background:#2e7d32; } 50% { background:#145c18; } }
+  @keyframes flash-yellow { 0%,100% { background:#f9a825; } 50% { background:#c17900; } }
+  #schermata-attivazione.flash-green{animation:flash-green 1s infinite;background:#2e7d32}
+  #schermata-attivazione.flash-yellow{animation:flash-yellow 1s infinite;background:#f9a825}
+  #schermata-attivazione.flash-red{animation:flash-red 1s infinite;background:#c62828}
   #schermata-attivazione .titolo { font-size: 34px; font-weight: 800; letter-spacing: 1px; }
   #schermata-attivazione .tipologia { font-size: 15px; text-transform: uppercase; opacity: .9; letter-spacing: 1px; }
   #schermata-attivazione .indirizzo { font-size: 24px; font-weight: 600; max-width: 90%; }
@@ -114,31 +119,125 @@
   }
 
   button { cursor: pointer; }
+
+  .status-small { font-size:11px; color:#cfd8dc; margin-left:8px; padding:3px 7px; border-radius:999px; background:#333; }
+  #schermata-missione { display:none; flex-direction:column; gap:12px; padding-bottom:30px; }
+  .mission-head { background:#fff; border-radius:14px; padding:14px; border:1px solid #ddd; position:sticky; top:0; z-index:5; }
+  .mission-head h2 { margin:4px 0; font-size:20px; }
+  .mission-head small { color:#666; }
+  .mission-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+  .state-btn { border:1px solid #cfd8dc; background:#fff; color:#37474f; border-radius:9px; padding:10px 12px; font-weight:800; font-size:12px; }
+  .state-btn.primary { background:#1565c0; color:#fff; border-color:#1565c0; }
+  .state-btn.danger { background:#fff3f3; color:#b71c1c; border-color:#ef9a9a; }
+  .state-btn:disabled { opacity:.45; cursor:not-allowed; }
+  .sheet-card { background:#fff; border:1px solid #ddd; border-radius:14px; padding:14px; }
+  .sheet-card h3 { margin:0 0 12px; font-size:15px; }
+  .sheet-card h4 { margin:17px 0 8px; font-size:12px; color:#455a64; }
+  .sheet-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .sheet-grid label { display:grid; gap:4px; font-size:10px; color:#607d8b; font-weight:700; }
+  .sheet-grid input,.sheet-grid select,.sheet-card textarea { width:100%; border:1px solid #d7dee8; background:#fbfcfe; border-radius:7px; padding:8px; }
+  .sheet-card textarea { min-height:80px; resize:vertical; }
+  .checks { display:flex; flex-wrap:wrap; gap:5px; }
+  .check { border:1px solid #d7dee8; background:#f8fafc; color:#657286; border-radius:7px; padding:7px 9px; font-size:10px; }
+  .check.on { background:#e0f2fe; border-color:#7dd3fc; color:#075985; }
+  .check span { margin-right:4px; }
+  .sheet-save { width:100%; margin-top:10px; border:0; background:#0f172a; color:#fff; border-radius:9px; padding:11px; font-weight:900; }
+  .audio-enable { background:#fff8e1; color:#795548; border:1px solid #ffcc80; border-radius:9px; padding:9px 12px; font-weight:800; }
+  .state-current { display:inline-block; font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px; background:#eceff1; }
+  .timeline { font-size:11px; color:#607d8b; display:grid; gap:5px; }
+  @media(max-width:650px){.sheet-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:430px){.sheet-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>IRIS v2 &middot; Postazione Mezzo</h1>
+  <h1>IRIS v2 &middot; Postazione Mezzo <span id="stato-mezzo-header" class="status-small">Disponibile</span></h1>
   <span id="stato-connessione">connessione...</span>
 </header>
 
 <main>
-  <!-- Selezione del mezzo dalla lista -->
   <section id="schermata-selezione">
     <p>Seleziona il mezzo su cui sei in servizio:</p>
-    <div id="lista-mezzi" class="lista-mezzi">
-      <p id="caricamento-mezzi">Carico l'elenco mezzi...</p>
-    </div>
+    <div id="lista-mezzi" class="lista-mezzi"><p id="caricamento-mezzi">Carico l'elenco mezzi...</p></div>
   </section>
 
-  <!-- In attesa di attivazione -->
   <section id="schermata-attesa">
     <div class="pallino"></div>
     <div class="mezzo-corrente" id="nome-mezzo-corrente"></div>
-    <div class="sottotitolo">In attesa di attivazione dalla centrale...</div>
-    <div class="sottotitolo">Tieni questa pagina aperta sullo schermo.</div>
+    <div class="sottotitolo" id="attesa-stato">Disponibile · in attesa di attivazione dalla centrale...</div>
+    <button id="abilita-audio" class="audio-enable">🔊 Abilita suoneria</button>
     <button id="cambia-mezzo">Cambia mezzo</button>
+  </section>
+
+  <section id="schermata-missione">
+    <div class="mission-head">
+      <div><span id="mission-priorita" class="state-current"></span> <b id="mission-numero"></b></div>
+      <h2 id="mission-indirizzo"></h2>
+      <small id="mission-meta"></small>
+      <div class="mission-actions" id="azioni-stato"></div>
+    </div>
+
+    <div class="sheet-card">
+      <h3>Scheda missione · Relazione di soccorso <small>Mod. 16</small></h3>
+      <div class="sheet-grid">
+        <label>Comune<input data-k="luogo_comune"></label>
+        <label>Via / piazza<input data-k="luogo_via"></label>
+        <label>N. civico<input data-k="luogo_civico"></label>
+        <label>Piano / scala<input data-k="luogo_piano_scala"></label>
+      </div>
+      <div class="checks" style="margin-top:8px"><button class="check" data-toggle="luogo_domicilio"><span>✓</span>Luogo = domicilio paziente</button></div>
+      <label style="display:grid;gap:4px;font-size:10px;color:#607d8b;font-weight:700;margin-top:10px">Note (da SOREU)<textarea data-k="note_soreu"></textarea></label>
+
+      <h4>Presenti sul luogo</h4>
+      <div class="checks" id="presenti-checks"></div><div id="presenti-extra"></div>
+
+      <h4>Informazioni relative al paziente</h4>
+      <div class="checks"><button class="check" data-toggle="sconosciuto"><span>✓</span>Paziente sconosciuto</button></div>
+      <div class="sheet-grid">
+        <label>Cognome<input data-k="cognome"></label><label>Nome<input data-k="nome"></label><label>Cittadinanza<input data-k="cittadinanza"></label>
+        <label>Data di nascita<input type="date" data-k="dataNascita"></label><label>Età<input id="eta" readonly></label><label>Sesso<select data-k="sesso"><option value="">—</option><option>M</option><option>F</option></select></label>
+        <label>Comune di residenza<input data-k="residenza_comune"></label><label>Via / piazza<input data-k="residenza_via"></label><label>N. civico<input data-k="residenza_civico"></label>
+      </div>
+
+      <h4>Evento</h4><div class="checks" id="evento-checks"></div>
+      <div class="checks" style="margin-top:7px"><button class="check" data-toggle="ev_precipitato"><span>✓</span>Precipitato da</button><input class="sheet-inline" data-k="ev_precipitato_metri" placeholder="metri" style="width:90px;border:1px solid #d7dee8;border-radius:7px;padding:7px"><button class="check" data-toggle="ev_incidente_stradale"><span>✓</span>Incidente stradale</button></div><div id="incidente-extra"></div>
+      <div class="fieldLabel">Luogo dell'evento</div><div class="checks" id="luogo-evento"></div>
+
+      <h4>Valutazione del paziente</h4>
+      <div class="checks" id="postura"></div>
+      <div class="sheet-grid"><label>Ora insorgenza sintomi<input type="time" data-k="ora_insorgenza"></label></div>
+      <div id="valutazioni"></div>
+      <div class="fieldLabel">CPSS</div><div class="checks" id="cpss"></div>
+
+      <h4>Prestazioni / interventi</h4>
+      <div class="sheet-grid"><label>Ossigeno l/min<input type="number" min="0" data-k="prest_ossigeno_lmin"></label></div>
+      <div class="checks" id="prestazioni"></div>
+
+      <h4>Presidi utilizzati</h4><div class="checks" id="presidi"></div>
+
+      <h4>Lesioni e aggravanti</h4><div class="checks" id="lesioni"></div><div id="lesioni-extra"></div>
+
+      <h4>Arresto cardiocircolatorio (ACC)</h4>
+      <div class="sheet-grid">
+        <label>Evento rilevato da<input data-k="acc_rilevato_da"></label><label>Inizio RCP ore<input type="time" data-k="acc_inizio_rcp"></label><label>Nr. shock<input type="number" min="0" data-k="acc_nr_shock"></label><label>ROSC ore<input type="time" data-k="acc_rosc"></label>
+      </div><div class="checks" id="acc-checks"></div>
+      <label style="display:grid;gap:4px;font-size:10px;color:#607d8b;font-weight:700;margin-top:10px">Note / anamnesi AMPIA<textarea data-k="anamnesi"></textarea></label>
+
+      <h4>Rifiuto trasporto / presidi</h4><div class="checks" id="rifiuti"></div>
+      <div class="sheet-grid"><label>Data<input type="date" data-k="rifiuto_data"></label><label>Ora<input type="time" data-k="rifiuto_ora"></label><label>Firma<input data-k="rifiuto_firma"></label></div>
+
+      <h4>Destinazione e codici di intervento</h4>
+      <div class="sheet-grid"><label>Azienda / istituto<input data-k="ospedale"></label><label>Ora accettazione<input type="time" data-k="ora_accettazione"></label><label>N. matricola compilatore<input data-k="matricola_compilatore"></label></div>
+      <div class="checks"><button class="check" data-toggle="destinazione_ps"><span>✓</span>Pronto Soccorso</button></div>
+      <div class="fieldLabel">Invio</div><div class="checks" id="codice-invio"></div><div class="fieldLabel">Trasporto</div><div class="checks" id="codice-trasporto"></div>
+
+      <h4>Dati interni OdV</h4>
+      <div class="sheet-grid"><label>Denomin. OdV<input data-k="odv_denominazione"></label><label>Targa / cod. mezzo<input data-k="odv_targa_mezzo"></label><label>Km iniziali<input data-k="odv_km_iniziali"></label><label>Km finali<input data-k="odv_km_finali"></label><label>Matr. autista<input data-k="odv_matr_autista"></label><label>Matr. soccorritore<input data-k="odv_matr_soccorritore1"></label><label>Matr. soccorritore<input data-k="odv_matr_soccorritore2"></label><label>Convenzione<input data-k="odv_convenzione"></label><label>N° interno<input data-k="odv_n_interno"></label></div>
+
+      <button id="salva-scheda" class="sheet-save">Salva scheda missione</button>
+    </div>
+    <div class="sheet-card"><h3>Cronologia missione</h3><div id="cronologia" class="timeline"></div></div>
   </section>
 </main>
 
@@ -158,196 +257,168 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 (function () {
-  // ---------------------------------------------------------------
-  // Configurazione: URL del backend. Modificalo con il tuo dominio
-  // Render (es. https://epcr-backend.onrender.com) prima del deploy,
-  // oppure passalo come ?api=https://... nella URL della pagina.
-  // ---------------------------------------------------------------
   const params = new URLSearchParams(location.search);
-  const API_URL = params.get("api") || "https://epcr-system.onrender.com"; localStorage.setItem("iris_api_url", API_URL);
-
+  const API_URL = params.get("api") || "https://epcr-system.onrender.com";
+  localStorage.setItem("iris_api_url", API_URL);
   const STORAGE_KEY = "iris_mezzo_selezionato";
 
   const elSelezione = document.getElementById("schermata-selezione");
   const elAttesa = document.getElementById("schermata-attesa");
+  const elMissione = document.getElementById("schermata-missione");
   const elAttivazione = document.getElementById("schermata-attivazione");
   const elListaMezzi = document.getElementById("lista-mezzi");
   const elNomeMezzoCorrente = document.getElementById("nome-mezzo-corrente");
   const elStatoConnessione = document.getElementById("stato-connessione");
+  const elStatoMezzoHeader = document.getElementById("stato-mezzo-header");
   const elAudioStatus = document.getElementById("audio-status");
   const alarmAudio = document.getElementById("attivazione-audio");
+
+  let mezzoSelezionato = null, missioneCorrente = null, interventoCorrente = null, socket = null;
+  let sheet = {};
   let audioUnlocked = false;
 
-  async function preparaAudio() {
-    try {
-      alarmAudio.volume = 1;
-      await alarmAudio.play();
-      alarmAudio.pause();
-      alarmAudio.currentTime = 0;
-      audioUnlocked = true;
-      elAudioStatus.textContent = "🔊 allarme pronto";
-    } catch(e) {
-      // Il browser richiede un gesto dell'utente: la selezione del mezzo chiama questa funzione.
-      elAudioStatus.textContent = "🔊 tocca per abilitare la suoneria";
-    }
+  const LABELS = {attivazione:"Attivazione",partenza:"Partenza",arrivo_sul_posto:"Arrivo sul posto",paziente_visto:"Paziente visto",partenza_ospedale:"Partenza per ospedale",arrivo_ospedale:"Arrivo in ospedale",libero_in_ospedale:"Libero in ospedale",rientro:"Rientro operativo",disponibile:"Disponibile"};
+  const NEXT = {attivazione:["partenza"],partenza:["arrivo_sul_posto","rientro"],arrivo_sul_posto:["paziente_visto","rientro"],paziente_visto:["partenza_ospedale","rientro"],partenza_ospedale:["arrivo_ospedale","rientro"],arrivo_ospedale:["libero_in_ospedale"],libero_in_ospedale:["rientro"],rientro:["disponibile"],disponibile:[]};
+  const COLORS={verde:"#2e7d32",giallo:"#f9a825",rosso:"#c62828"};
+  const COSCIENZA=[["sveglio","Sveglio (A)"],["reag_chiamata","Reagisce a chiamata (V)"],["reag_dolore","Reagisce a dolore (P)"],["incosciente","Incosciente (U)"]];
+  const RESPIRO=[["normale","Normale"],["difficoltoso","Difficoltoso"],["assente","Assente"]];
+  const CIRCOLO=[["periferico","Periferico"],["centrale","Centrale"],["ritmico","Ritmico"],["aritmico","Aritmico"],["assente","Assente"]];
+  const CUTE=[["calda","Calda"],["fredda","Fredda"],["rosea","Rosea"],["cianotica","Cianotica"],["pallida","Pallida"],["sudata","Sudata"]];
+  const POSTURA=[["in_piedi","In piedi"],["seduta","Seduta"],["prona","Prona"],["supina","Supina"],["laterale","Laterale"]];
+  const LUOGO=[["casa","Casa"],["strada","Strada"],["uffici_esercizi_pubb","Uffici / esercizi pubb."],["imp_sportivo","Impianto sportivo"],["imp_lavorativo","Impianto lavorativo"],["altro","Altro"]];
+  const EVENTI=[["perdita_coscienza","Perdita di coscienza"],["problem_respirat","Problematiche respiratorie"],["malore","Malore"],["convulsioni","Convulsioni"],["avvelenamenti","Avvelenamenti"],["travaglio_parto","Travaglio / parto"],["malessere","Malessere"],["caduta","Caduta"],["evento_violento","Evento violento"],["infortunio","Infortunio"]];
+  const PREST=["aspirazione_cavo_orale","cannula_of","ventilazione","rcp","applicazione_dae","trasmissione_ecg","rimozione_casco","emostasi","medicazione_ferite","immobilizzazione_arti","immobilizzazione_spinale","protezione_termica","estricazione"];
+  const PRES=["collare_cervicale","barella_cucchiaio","tavola_spinale","sedia_portantina","materasso_depressione","estricatore","steccobenda","telo_porta_feriti","fascia_emostatica"];
+  const LES=["amputazione","frattura_esposta","deformita","dolore","sanguinamento","emorragia_massiva","ferita","ferita_penetrante","lacerazione_schiacciamento","contusione","ustione","edema","lesioni_incompatibili_vita","proiettato","incastrato","accesso_difficile","presenza_deceduti","estricazione_20_min","motilita_assente","sensibilita_assente"];
+  const ACC=[["acc_rcp_gia_in_corso","RCP già in corso"],["acc_durante_trasporto","ACC durante il trasporto"],["acc_trasporto_con_rcp","Trasporto con RCP"],["acc_deceduto","Deceduto"]];
+  const RIFIUTI=[["rifiuto_trasporto","Rifiuto il trasporto in ospedale"],["rifiuto_presidi","Rifiuto l'applicazione dei presidi"]];
+  const CODICE=[["verde","VERDE"],["giallo","GIALLO"],["rosso","ROSSO"]];
+
+  function vaiA(s){elSelezione.style.display=s==="selezione"?"flex":"none";elAttesa.style.display=s==="attesa"?"flex":"none";elMissione.style.display=s==="missione"?"flex":"none";elAttivazione.style.display=s==="attivazione"?"flex":"none";}
+  function setHeaderState(stato){elStatoMezzoHeader.textContent=LABELS[stato]||stato||"Disponibile";}
+
+  async function preparaAudio(){
+    try{alarmAudio.volume=1;await alarmAudio.play();alarmAudio.pause();alarmAudio.currentTime=0;audioUnlocked=true;elAudioStatus.textContent="🔊 allarme pronto";}catch(e){elAudioStatus.textContent="🔊 premi Abilita suoneria";}}
+  async function startAlarm(){
+    try{alarmAudio.currentTime=0;alarmAudio.volume=1;await alarmAudio.play();elAudioStatus.textContent="🚨 ALLARME ATTIVO";}catch(e){elAudioStatus.textContent="🔇 premi Abilita suoneria";}}
+  function stopAlarm(){alarmAudio.pause();alarmAudio.currentTime=0;elAudioStatus.textContent="🔊 allarme pronto";}
+
+  function labelize(k){return k.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());}
+  function setSheet(k,v){sheet[k]=v; renderSheet();}
+  function toggle(k){sheet[k]=!sheet[k];renderSheet();}
+  function arrToggle(k,v){const a=Array.isArray(sheet[k])?sheet[k]:[];sheet[k]=a.includes(v)?a.filter(x=>x!==v):[...a,v];renderSheet();}
+  function checks(container,items,mode="bool"){
+    const el=document.getElementById(container); if(!el)return; el.innerHTML="";
+    items.forEach(([k,l])=>{const b=document.createElement("button");b.type="button";b.className="check "+(mode==="arr"?(sheet[container+"Arr"]||[]).includes(k):sheet[k]?"on":"");b.innerHTML="<span>✓</span>"+l;b.onclick=()=>mode==="arr"?arrToggle(container+"Arr",k):toggle(k);el.appendChild(b);});
   }
-  async function startAlarm() {
-    try {
-      alarmAudio.currentTime = 0;
-      alarmAudio.volume = 1;
-      await alarmAudio.play();
-      elAudioStatus.textContent = "🚨 ALLARME ATTIVO";
-    } catch(e) {
-      elAudioStatus.textContent = "🔇 premi lo schermo per attivare l'audio";
-    }
-  }
-  function stopAlarm() {
-    alarmAudio.pause();
-    alarmAudio.currentTime = 0;
-    elAudioStatus.textContent = "🔊 allarme pronto";
-  }
+  function radio(container,items,key){const el=document.getElementById(container);el.innerHTML="";items.forEach(([k,l])=>{const b=document.createElement("button");b.type="button";b.className="check "+(sheet[key]===k?"on":"");b.innerHTML="<span>✓</span>"+l;b.onclick=()=>{sheet[key]=sheet[key]===k?"":k;renderSheet()};el.appendChild(b);});}
 
-  let mezzoSelezionato = null; // { id, nome }
-  let interventoCorrente = null; // { interventoId, mezzoId }
-  let socket = null;
-
-  function vaiA(schermata) {
-    elSelezione.style.display = schermata === "selezione" ? "flex" : "none";
-    elAttesa.style.display = schermata === "attesa" ? "flex" : "none";
-    elAttivazione.style.display = schermata === "attivazione" ? "flex" : "none";
-  }
-
-  function badgeClasse(stato) {
-    return { disponibile: "disponibile", impegnato: "impegnato", fuori_servizio: "fuori_servizio" }[stato] || "";
-  }
-
-  async function caricaMezzi() {
-    elListaMezzi.innerHTML = "<p>Carico l'elenco mezzi...</p>";
-    try {
-      const res = await fetch(`${API_URL}/mezzi`);
-      if (!res.ok) throw new Error("risposta non ok");
-      const mezzi = await res.json();
-
-      if (!mezzi.length) {
-        elListaMezzi.innerHTML = "<p>Nessun mezzo configurato. Contatta la centrale.</p>";
-        return;
-      }
-
-      elListaMezzi.innerHTML = "";
-      mezzi.forEach((m) => {
-        const btn = document.createElement("button");
-        btn.className = "mezzo-btn";
-        btn.innerHTML = `
-          <span>${m.nome}${m.targa ? `<br/><span class="targa">${m.targa}</span>` : ""}</span>
-          <span class="badge ${badgeClasse(m.stato)}">${m.stato.replace("_", " ")}</span>
-        `;
-        btn.addEventListener("click", () => selezionaMezzo({ id: m.id, nome: m.nome }));
-        elListaMezzi.appendChild(btn);
-      });
-    } catch (err) {
-      elListaMezzi.innerHTML = `<p>Impossibile contattare il backend (${API_URL}). Verifica la connessione o l'indirizzo del server.</p>`;
-    }
-  }
-
-  function selezionaMezzo(mezzo) {
-    preparaAudio();
-    mezzoSelezionato = mezzo;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mezzo));
-    elNomeMezzoCorrente.textContent = mezzo.nome;
-    vaiA("attesa");
-    connettiSocket();
-  }
-
-  function connettiSocket() {
-    if (socket) socket.disconnect();
-
-    socket = io(API_URL, { transports: ["websocket", "polling"] });
-
-    socket.on("connect", () => {
-      elStatoConnessione.textContent = "online";
-      elStatoConnessione.className = "online";
-      socket.emit("registra", { ruolo: "mezzo", id: mezzoSelezionato.id });
+  function bindFields(){
+    document.querySelectorAll("[data-k]").forEach(el=>{
+      const k=el.dataset.k; if(el.dataset.bound)return; el.dataset.bound="1";
+      el.addEventListener("input",()=>{sheet[k]=el.value;if(k==="dataNascita")updateAge();});
+      el.addEventListener("change",()=>{sheet[k]=el.value;if(k==="dataNascita")updateAge();});
     });
+    document.querySelectorAll("[data-toggle]").forEach(b=>{if(b.dataset.bound)return;b.dataset.bound="1";b.onclick=()=>toggle(b.dataset.toggle);});
+  }
+  function updateAge(){const v=sheet.dataNascita;if(!v){document.getElementById("eta").value="";return;}const d=new Date(v),n=new Date();let a=n.getFullYear()-d.getFullYear();if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--;document.getElementById("eta").value=Math.max(0,a);}
+  function syncFields(){document.querySelectorAll("[data-k]").forEach(el=>{const k=el.dataset.k;if(document.activeElement!==el)el.value=sheet[k]??"";});updateAge();}
 
-    socket.on("disconnect", () => {
-      elStatoConnessione.textContent = "offline";
-      elStatoConnessione.className = "offline";
-    });
-
-    socket.on("connect_error", () => {
-      elStatoConnessione.textContent = "errore connessione";
-      elStatoConnessione.className = "offline";
-    });
-
-    // Evento inviato dal backend quando la centrale assegna un intervento a QUESTO mezzo
-    socket.on("attivazione", (dati) => {
-      mostraAttivazione(dati);
-    });
+  function renderVal(i){
+    const e=sheet["eval"+i]||{}; const wrap=document.createElement("div");wrap.className="sheet-card";wrap.style.marginTop="8px";
+    wrap.innerHTML=`<h4>${i+1}ª valutazione</h4><div class="checks"><button class="check ${e.attiva?"on":""}" data-v="attiva"><span>✓</span>Effettuata</button></div><div class="sheet-grid"><label>Ora<input type="time" data-v="ora" value="${e.ora||""}"></label></div><div class="fieldLabel">Coscienza</div><div class="checks" data-vrad="coscienza"></div><div class="fieldLabel">Respiro</div><div class="checks" data-vrad="respiro"></div><div class="fieldLabel">Circolo</div><div class="checks" data-varr="circolo"></div><div class="fieldLabel">Cute</div><div class="checks" data-varr="cute"></div><div class="sheet-grid">${["fr","fc","satAria","satO2","pa","temp","glicemia"].map(k=>`<label>${({fr:"FR",fc:"FC",satAria:"Sat. aria",satO2:"Sat. O₂",pa:"PA",temp:"Temperatura °C",glicemia:"Glicemia"})[k]}<input data-v="${k}" value="${e[k]||""}"></label>`).join("")}</div>`;
+    const state=sheet["eval"+i]||{}; const update=(k,v)=>{sheet["eval"+i]={...(sheet["eval"+i]||{}),[k]:v};renderSheet();};
+    wrap.querySelector('[data-v="attiva"]').onclick=()=>update("attiva",!state.attiva);
+    wrap.querySelectorAll("[data-v]").forEach(el=>{if(el.dataset.v==="attiva")return;el.oninput=()=>update(el.dataset.v,el.value)});
+    const makeRad=(sel,opts,k)=>{const el=wrap.querySelector(sel);opts.forEach(([v,l])=>{const b=document.createElement("button");b.className="check "+(state[k]===v?"on":"");b.innerHTML="<span>✓</span>"+l;b.onclick=()=>update(k,state[k]===v?"":v);el.appendChild(b);});};
+    makeRad('[data-vrad="coscienza"]',COSCIENZA,"coscienza");makeRad('[data-vrad="respiro"]',RESPIRO,"respiro");
+    [["circolo",CIRCOLO],["cute",CUTE]].forEach(([k,opts])=>{const el=wrap.querySelector(`[data-varr="${k}"]`);opts.forEach(([v,l])=>{const b=document.createElement("button");b.className="check "+((state[k]||[]).includes(v)?"on":"");b.innerHTML="<span>✓</span>"+l;b.onclick=()=>update(k,(state[k]||[]).includes(v)?state[k].filter(x=>x!==v):[...(state[k]||[]),v]);el.appendChild(b);});});
+    return wrap;
   }
 
-  function mostraAttivazione(dati) {
-    interventoCorrente = dati;
-    document.getElementById("att-tipologia").textContent = `${dati.missioneNumero || ""} · ${(dati.priorita || "").toUpperCase()} · ${dati.tipologia || ""}`;
-    document.getElementById("att-indirizzo").textContent = dati.indirizzo || "";
-    document.getElementById("att-note").textContent = dati.note || "";
+  function renderSheet(){
+    bindFields(); syncFields();
+    checks("presenti-checks",[["presenti_msa1","MSA1"],["presenti_msa2","MSA2"],["presenti_cnsas","CNSAS"],["presenti_vvf","VVF"],["presenti_cc","CC"],["presenti_polizia","Polizia"],["presenti_medico","Medico"],["presenti_altro","Altro"]]);
+    const pe=document.getElementById("presenti-extra");pe.innerHTML="";
+    if(sheet.presenti_medico)pe.innerHTML+='<input data-k="presenti_medico_nome" placeholder="Qualifica / nominativo" style="margin-top:6px;border:1px solid #d7dee8;border-radius:7px;padding:7px">';
+    if(sheet.presenti_altro)pe.innerHTML+='<input data-k="presenti_altro_testo" placeholder="Specificare" style="margin-top:6px;border:1px solid #d7dee8;border-radius:7px;padding:7px">';
+    checks("evento-checks",EVENTI);
+    const ie=document.getElementById("incidente-extra");ie.innerHTML="";
+    if(sheet.ev_incidente_stradale){const c=document.createElement("div");c.className="checks";[["is_pedone_ciclo","Pedone / ciclo"],["is_conducente","Conducente"],["is_moto","Moto"],["is_auto","Auto"],["is_passeggero","Passeggero"],["is_altro","Altro"]].forEach(([k,l])=>{const b=document.createElement("button");b.className="check "+(sheet[k]?"on":"");b.innerHTML="<span>✓</span>"+l;b.onclick=()=>toggle(k);c.appendChild(b);});ie.appendChild(c);if(sheet.is_altro){const inp=document.createElement("input");inp.dataset.k="is_altro_testo";inp.placeholder="Specificare";inp.style.cssText="margin-top:6px;border:1px solid #d7dee8;border-radius:7px;padding:7px;width:100%";ie.appendChild(inp);}}
 
-    const linkMappa = document.getElementById("att-mappa");
-    if (dati.lat && dati.lon) {
-      linkMappa.href = `https://www.google.com/maps/search/?api=1&query=${dati.lat},${dati.lon}`;
-    } else if (dati.indirizzo) {
-      linkMappa.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dati.indirizzo)}`;
-    }
-
-    vaiA("attivazione");
-
-    // Suono e vibrazione per attirare l'attenzione (funzionano solo a pagina aperta/attiva:
-    // un browser web non può "svegliare" il telefono a schermo spento come farebbe una vera
-    // push notification nativa - per quello serve l'app mobile o una configurazione Web Push).
-    startAlarm();
-    if (navigator.vibrate) navigator.vibrate([500, 250, 500, 250, 500]);
+    radio("luogo-evento",LUOGO,"luogo_evento");radio("postura",POSTURA,"postura");
+    const v=document.getElementById("valutazioni");v.innerHTML="";[0,1,2].forEach(i=>v.appendChild(renderVal(i)));
+    checks("cpss",[["deviazione_rima_labiale","Deviazione rima labiale"],["segni_di_lato","Segni di lato"],["alterazioni_linguaggio","Alterazioni linguaggio"]]);
+    checks("prestazioni",PREST.map(k=>["prest_"+k,labelize(k)]));checks("presidi",PRES.map(k=>["pres_"+k,labelize(k)]));
+    checks("lesioni",LES.map(k=>["les_"+k,labelize(k)]));
+    const le=document.getElementById("lesioni-extra");le.innerHTML="";
+    LES.filter(k=>sheet["les_"+k]).forEach(k=>{const row=document.createElement("div");row.style.cssText="display:grid;grid-template-columns:1fr 120px;gap:7px;margin-top:5px";row.innerHTML=`<input data-k="les_${k}_zona" placeholder="Zona interessata" style="border:1px solid #d7dee8;border-radius:7px;padding:7px">${k==="dolore"?'<select data-k="les_dolore_intensita" style="border:1px solid #d7dee8;border-radius:7px;padding:7px"><option value="">Intensità</option>'+Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}/10</option>`).join("")+'</select>':""}`;le.appendChild(row);});
+    if(sheet.prest_estricazione){const b=document.createElement("button");b.className="check "+(sheet.prest_estricazione_rapida?"on":"");b.innerHTML="<span>✓</span>estricazione rapida";b.onclick=()=>toggle("prest_estricazione_rapida");document.getElementById("prestazioni").appendChild(b);}
+    checks("acc-checks",ACC);checks("rifiuti",RIFIUTI);radio("codice-invio",CODICE,"codice_invio");radio("codice-trasporto",CODICE,"codice_trasporto");
+    syncFields(); bindFields();
+    document.querySelectorAll("[data-toggle]").forEach(b=>b.classList.toggle("on",!!sheet[b.dataset.toggle]));
   }
 
-  async function confermaPresaInCarico() {
-    if (!interventoCorrente) return;
-    stopAlarm();
-    if (navigator.vibrate) navigator.vibrate(0);
-
-    try {
-      await fetch(`${API_URL}/interventi/${interventoCorrente.interventoId}/conferma-mezzo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mezzoId: mezzoSelezionato.id }),
-      });
-    } catch (err) {
-      console.error("Errore invio conferma:", err);
-    }
-
-    interventoCorrente = null;
-    vaiA("attesa");
+  async function caricaMezzi(){
+    try{const r=await fetch(`${API_URL}/mezzi`);const mezzi=await r.json();elListaMezzi.innerHTML="";if(!mezzi.length){elListaMezzi.innerHTML="<p>Nessun mezzo configurato. Contatta la centrale.</p>";return;}
+      mezzi.forEach(m=>{const b=document.createElement("button");b.className="mezzo-btn";b.innerHTML=`<span>${m.nome}${m.targa?`<br/><span class="targa">${m.targa}</span>`:""}</span><span class="badge">${LABELS[m.ultimo_stato]||m.stato.replace("_"," ")}</span>`;b.querySelector(".badge").style.background=m.stato==="disponibile"?"#2e7d32":m.stato==="impegnato"?"#ef6c00":"#757575";b.onclick=()=>selezionaMezzo({id:m.id,nome:m.nome,stato:m.stato,ultimo_stato:m.ultimo_stato});elListaMezzi.appendChild(b);});
+    }catch(e){elListaMezzi.innerHTML=`<p>Impossibile contattare il backend (${API_URL}).</p>`;}
   }
 
-  document.getElementById("conferma-btn").addEventListener("click", confermaPresaInCarico);
-  document.getElementById("cambia-mezzo").addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEY);
-    if (socket) socket.disconnect();
-    mezzoSelezionato = null;
-    vaiA("selezione");
-    caricaMezzi();
-  });
-
-  // All'avvio: se il mezzo era già stato scelto in precedenza, riparti da lì
-  const salvato = localStorage.getItem(STORAGE_KEY);
-  if (salvato) {
-    try {
-      selezionaMezzo(JSON.parse(salvato));
-    } catch {
-      vaiA("selezione");
-      caricaMezzi();
-    }
-  } else {
-    vaiA("selezione");
-    caricaMezzi();
+  async function selezionaMezzo(mezzo){
+    await preparaAudio();mezzoSelezionato=mezzo;localStorage.setItem(STORAGE_KEY,JSON.stringify(mezzo));elNomeMezzoCorrente.textContent=mezzo.nome;setHeaderState(mezzo.ultimo_stato||mezzo.stato);connettiSocket();await caricaMissioneAttiva();
   }
+  async function caricaMissioneAttiva(){
+    try{const r=await fetch(`${API_URL}/interventi/mezzo/${mezzoSelezionato.id}/attiva`);const m=await r.json();if(m){missioneCorrente=m;sheet={...(m.scheda||{})};renderMissione();}else vaiA("attesa");}catch(e){vaiA("attesa");}
+  }
+  function statoCorrente(m=missioneCorrente){
+    if(!m)return "disponibile";
+    const a=(m.cronologia||[]).filter(x=>x.mezzo_id===mezzoSelezionato.id);return a.length?a[a.length-1].stato:"attivazione";
+  }
+  function renderMissione(){
+    if(!missioneCorrente)return;
+    const st=statoCorrente();setHeaderState(st);document.getElementById("mission-numero").textContent=missioneCorrente.missione_numero||"";document.getElementById("mission-indirizzo").textContent=missioneCorrente.indirizzo||"";document.getElementById("mission-meta").textContent=`${missioneCorrente.tipologia||"Missione"} · priorità ${(missioneCorrente.priorita||"").toUpperCase()}${missioneCorrente.note?" · "+missioneCorrente.note:""}`;
+    const pr=document.getElementById("mission-priorita");pr.textContent=(missioneCorrente.priorita||"").toUpperCase();pr.style.background=COLORS[missioneCorrente.priorita]||"#eceff1";pr.style.color="#fff";
+    const box=document.getElementById("azioni-stato");box.innerHTML="";(NEXT[st]||[]).forEach((next,i)=>{const b=document.createElement("button");b.className="state-btn "+(next==="rientro"?"danger":"primary");b.textContent=LABELS[next];b.onclick=()=>cambiaStato(next);box.appendChild(b);});
+    document.getElementById("cronologia").innerHTML=(missioneCorrente.cronologia||[]).filter(x=>x.mezzo_id===mezzoSelezionato.id).slice().reverse().map(x=>`<div>${new Date(x.registrato_il).toLocaleString("it-IT")} · <b>${LABELS[x.stato]||x.stato}</b></div>`).join("")||"Nessun evento";
+    vaiA("missione");renderSheet();
+  }
+  async function cambiaStato(stato){
+    if(!missioneCorrente)return;
+    try{const r=await fetch(`${API_URL}/interventi/${missioneCorrente.id}/stato`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mezzoId:mezzoSelezionato.id,stato})});if(!r.ok){const d=await r.json();throw new Error(d.errore||"Cambio stato non riuscito");}missioneCorrente=await r.json();sheet={...(missioneCorrente.scheda||{})};renderMissione();}catch(e){elAudioStatus.textContent="⚠️ "+e.message;}
+  }
+  async function salvaScheda(){
+    if(!missioneCorrente)return;
+    try{const r=await fetch(`${API_URL}/interventi/${missioneCorrente.id}/scheda`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({scheda:sheet,ospedale:sheet.ospedale||missioneCorrente.ospedale||null,priorita:missioneCorrente.priorita})});if(!r.ok)throw new Error("Salvataggio non riuscito");missioneCorrente=await r.json();sheet={...(missioneCorrente.scheda||{})};renderMissione();elAudioStatus.textContent="✓ Scheda salvata";}catch(e){elAudioStatus.textContent="⚠️ "+e.message;}
+  }
+
+  function mostraAttivazione(d){
+    interventoCorrente=d;setHeaderState("attivazione");
+    document.getElementById("att-tipologia").textContent=`${d.missioneNumero||""} · ${(d.priorita||"").toUpperCase()} · ${d.tipologia||""}`;
+    document.getElementById("att-indirizzo").textContent=d.indirizzo||"";
+    document.getElementById("att-note").textContent=d.note||"";
+    const a=document.getElementById("schermata-attivazione");a.classList.remove("flash-green","flash-yellow","flash-red");a.classList.add("flash-"+(d.priorita||"rosso"));
+    const link=document.getElementById("att-mappa");link.href=d.lat&&d.lon?`https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lon}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.indirizzo||"")}`;
+    vaiA("attivazione");startAlarm();
+  }
+  function connettiSocket(){
+    if(socket)socket.disconnect();socket=io(API_URL,{transports:["websocket","polling"]});
+    socket.on("connect",()=>{elStatoConnessione.textContent="online";elStatoConnessione.className="online";socket.emit("registra",{ruolo:"mezzo",id:mezzoSelezionato.id});});
+    socket.on("disconnect",()=>{elStatoConnessione.textContent="offline";elStatoConnessione.className="offline";});
+    socket.on("connect_error",()=>{elStatoConnessione.textContent="errore connessione";elStatoConnessione.className="offline";});
+    socket.on("attivazione",d=>{mostraAttivazione(d);if(navigator.vibrate)navigator.vibrate([500,250,500,250,500]);});
+    socket.on("stato_missione",d=>{const id=d.interventoId||d.missione?.id;if(missioneCorrente&&id===missioneCorrente.id){caricaMissioneAttiva();}});
+    socket.on("missione_aggiornata",d=>{if(missioneCorrente&&d.id===missioneCorrente.id){caricaMissioneAttiva();}});
+    socket.on("missione_rimossa",d=>{if(missioneCorrente&&d.interventoId===missioneCorrente.id){missioneCorrente=null;sheet={};vaiA("attesa");}});
+  }
+
+  document.getElementById("conferma-btn").addEventListener("click",async()=>{if(!interventoCorrente)return;stopAlarm();if(navigator.vibrate)navigator.vibrate(0);await caricaMissioneAttiva();interventoCorrente=null;});
+  document.getElementById("abilita-audio").addEventListener("click",preparaAudio);
+  document.getElementById("salva-scheda").addEventListener("click",salvaScheda);
+  document.getElementById("cambia-mezzo").addEventListener("click",()=>{localStorage.removeItem(STORAGE_KEY);if(socket)socket.disconnect();mezzoSelezionato=null;missioneCorrente=null;vaiA("selezione");caricaMezzi();});
+
+  const salvato=localStorage.getItem(STORAGE_KEY);
+  if(salvato){try{selezionaMezzo(JSON.parse(salvato));}catch{vaiA("selezione");caricaMezzi();}}else{vaiA("selezione");caricaMezzi();}
 })();
 </script>
 </body>

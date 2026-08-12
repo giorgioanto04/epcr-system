@@ -157,6 +157,20 @@ export async function interventiRoutes(app: FastifyInstance) {
     if(!mezzoId)return reply.code(400).send({errore:"mezzoId obbligatorio"});
     const exists=await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2",[id,mezzoId]);
     if(!exists.rows.length)return reply.code(409).send({errore:"Mezzo non associato alla missione"});
+    const ultimo = await pool.query("SELECT stato FROM stati_intervento WHERE intervento_id=$1 AND mezzo_id=$2 ORDER BY registrato_il DESC LIMIT 1",[id,mezzoId]);
+    const precedente = ultimo.rows[0]?.stato || "attivazione";
+    const transizioni:any = {
+      attivazione:["partenza"],
+      partenza:["arrivo_sul_posto","rientro"],
+      arrivo_sul_posto:["paziente_visto","rientro"],
+      paziente_visto:["partenza_ospedale","rientro"],
+      partenza_ospedale:["arrivo_ospedale","rientro"],
+      arrivo_ospedale:["libero_in_ospedale"],
+      libero_in_ospedale:["rientro"],
+      rientro:["disponibile"],
+      disponibile:[]
+    };
+    if (!transizioni[precedente]?.includes(stato)) return reply.code(409).send({errore:`Da "${precedente}" è possibile passare solo a: ${(transizioni[precedente]||[]).join(", ") || "nessuno"}`});
     await pool.query("INSERT INTO stati_intervento(intervento_id,mezzo_id,stato) VALUES($1,$2,$3)",[id,mezzoId,stato]);
     const map:any={attivazione:'assegnato',partenza:'in_corso',arrivo_sul_posto:'in_corso',paziente_visto:'in_corso',partenza_ospedale:'in_corso',arrivo_ospedale:'in_corso',libero_in_ospedale:'in_corso',rientro:'in_corso',disponibile:'in_corso'};
     await pool.query("UPDATE interventi SET stato=$1,ora_arrivo=CASE WHEN $2='arrivo_sul_posto' THEN now() ELSE ora_arrivo END,ora_rientro=CASE WHEN $2='rientro' THEN now() ELSE ora_rientro END WHERE id=$3",[map[stato],stato,id]);
