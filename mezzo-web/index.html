@@ -154,6 +154,94 @@
   body,button,input,select,textarea{font-family:Arial,sans-serif}
   h1,h2,h3,h4,strong{font-weight:800}
   .patient-delete{display:block;margin-top:8px;border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;border-radius:8px;padding:7px 10px;font-weight:800}
+
+  /* IRIS – Web Mezzi / interfaccia operativa professionale */
+  :root{
+    --iris-navy:#17212b;
+    --iris-navy-2:#22303d;
+    --iris-border:#d9e0e6;
+    --iris-bg:#eef1f4;
+    --iris-card:#ffffff;
+    --iris-text:#25313b;
+    --iris-muted:#65727e;
+    --iris-accent:#1769aa;
+  }
+  html,body{background:var(--iris-bg);color:var(--iris-text)}
+  body,button,input,select,textarea{
+    font-family:Roboto,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight:400;
+    letter-spacing:0;
+  }
+  header{
+    background:var(--iris-navy);
+    min-height:64px;
+    padding:10px 16px;
+    border-bottom:3px solid #314454;
+  }
+  header h1{font-size:15px;font-weight:500;letter-spacing:.15px}
+  .header-title{gap:4px}
+  .header-state{
+    font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.35px;
+    background:var(--iris-navy-2);border:1px solid #41515e;border-radius:4px;padding:3px 7px;
+  }
+  #stato-connessione{font-size:10px;font-weight:500;border-radius:4px;padding:4px 7px;text-transform:uppercase;letter-spacing:.3px}
+  main{padding:16px;gap:12px;max-width:1100px;width:100%;margin:0 auto}
+  #schermata-selezione p{color:var(--iris-muted);font-size:13px}
+  .lista-mezzi{gap:7px}
+  .mezzo-btn{
+    border:1px solid var(--iris-border);border-radius:6px;padding:13px 14px;
+    box-shadow:0 1px 2px rgba(23,33,43,.05);font-size:15px;font-weight:500;
+  }
+  .mezzo-btn:hover{border-color:#b7c3cc;background:#f9fbfc}
+  .mezzo-btn .targa{font-size:12px;color:var(--iris-muted);font-weight:400}
+  .mezzo-btn .badge{border-radius:4px;padding:3px 7px;font-size:9px;font-weight:500;letter-spacing:.35px}
+  #schermata-attesa{gap:9px}
+  #schermata-attesa .mezzo-corrente{font-size:19px;font-weight:500}
+  #schermata-attesa .sottotitolo{font-size:14px;color:var(--iris-muted)}
+  #cambia-mezzo{font-size:12px;color:var(--iris-accent);text-decoration:none;margin-top:14px;border:1px solid #c3d0da;border-radius:5px;padding:7px 10px;background:#fff}
+  #cambia-mezzo:hover{background:#f7fafc}
+  #schermata-attivazione{padding:24px;gap:13px}
+  #schermata-attivazione .titolo{font-size:30px;font-weight:600;letter-spacing:.2px}
+  #schermata-attivazione .tipologia{font-size:12px;font-weight:500;letter-spacing:.8px}
+  #schermata-attivazione .indirizzo{font-size:22px;font-weight:500}
+  #conferma-btn{border-radius:6px;padding:15px 24px;font-size:16px;font-weight:500;box-shadow:0 2px 5px rgba(0,0,0,.12)}
+  .mission-head,.sheet-card{border-radius:7px;border:1px solid var(--iris-border);box-shadow:0 1px 3px rgba(23,33,43,.04)}
+  .mission-head{padding:13px}
+  .mission-head h2{font-size:18px;font-weight:500}
+  .mission-head small{color:var(--iris-muted)}
+  .mission-actions{gap:6px;margin-top:10px}
+  .state-btn{
+    border-radius:5px;padding:9px 11px;font-size:11px;font-weight:500;
+    min-height:36px;box-shadow:none;
+  }
+  .state-btn.primary{background:var(--iris-accent);border-color:var(--iris-accent)}
+  .state-btn.danger{background:#fff7f7;color:#a62b2b;border-color:#dca4a4}
+  .sheet-card{padding:13px}
+  .sheet-card h3{font-size:14px;font-weight:500;margin-bottom:10px}
+  .sheet-card h4{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.45px;color:#53616d;margin:15px 0 7px}
+  .sheet-grid{gap:7px}
+  .sheet-grid label{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#687783}
+  .sheet-grid input,.sheet-grid select,.sheet-card textarea{border-radius:5px;border:1px solid #cfd8df;background:#fff;padding:8px;font-size:13px}
+  .checks{gap:5px}
+  .check{border-radius:5px;padding:7px 9px;font-size:10px;font-weight:400;background:#fff}
+  .check.on{font-weight:500}
+  .sheet-save{border-radius:5px;padding:10px;font-size:12px;font-weight:500;letter-spacing:.15px}
+  .audio-enable{border-radius:5px;padding:8px 10px;font-size:11px;font-weight:500}
+  .state-current{border-radius:4px;font-weight:500;padding:3px 7px}
+  .timeline{font-size:10px}
+  .patient-card{background:#f7f9fb}
+  .patient-toolbar small{font-size:10px}
+  .patient-add{border-radius:5px;padding:8px 10px;font-size:11px;font-weight:500}
+  .patient-tabs{gap:5px}
+  .patient-tab{border-radius:5px;padding:7px 9px;font-size:10px;font-weight:400}
+  .patient-tab.active{font-weight:500}
+  .patient-info{font-size:10px}
+  .patient-info select{border-radius:5px;padding:5px;font-size:11px}
+  .patient-delete{border-radius:5px;padding:6px 9px;font-size:10px;font-weight:500}
+  #azioni-stato{border-top:1px solid #e0e5e9;padding-top:10px}
+  .status-small{font-size:9px;border-radius:4px;font-weight:500}
+  /* niente pesi tipografici artificialmente pesanti */
+  h1,h2,h3,h4,strong{font-weight:500}
 </style>
 </head>
 <body>
