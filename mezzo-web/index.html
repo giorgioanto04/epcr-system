@@ -262,9 +262,11 @@
   const params = new URLSearchParams(location.search);
   const API_URL = params.get("api") || "https://epcr-system.onrender.com";
   localStorage.setItem("iris_api_url", API_URL);
-  const STORAGE_KEY = "iris_mezzo_selezionato";
+  // La selezione è volutamente per scheda/dispositivo: non usare localStorage
+  // perché condivide il valore tra finestre dello stesso browser. La URL non
+  // forza più un mezzo: ogni dispositivo deve scegliere il proprio.
+  const STORAGE_KEY = "iris_mezzo_selezionato_sessione";
   const MEZZO_QUERY_KEY = "mezzo";
-  const mezzoDaLink = params.get(MEZZO_QUERY_KEY);
 
   const elSelezione = document.getElementById("schermata-selezione");
   const elAttesa = document.getElementById("schermata-attesa");
@@ -370,8 +372,8 @@
   }
 
   async function selezionaMezzo(mezzo){
-    await preparaAudio();mezzoSelezionato=mezzo;localStorage.setItem(STORAGE_KEY,JSON.stringify(mezzo));
-    const url=new URL(location.href);url.searchParams.set(MEZZO_QUERY_KEY,mezzo.id);history.replaceState({},"",url.toString());
+    await preparaAudio();mezzoSelezionato=mezzo;sessionStorage.setItem(STORAGE_KEY,JSON.stringify(mezzo));
+    const url=new URL(location.href);url.searchParams.delete(MEZZO_QUERY_KEY);history.replaceState({},"",url.toString());
     elNomeMezzoCorrente.textContent=mezzo.nome;setHeaderState(mezzo.ultimo_stato||mezzo.stato);connettiSocket();await caricaMissioneAttiva();
   }
   async function caricaMissioneAttiva(){
@@ -422,19 +424,21 @@
   document.getElementById("conferma-btn").addEventListener("click",async()=>{if(!interventoCorrente)return;stopAlarm();if(navigator.vibrate)navigator.vibrate(0);await caricaMissioneAttiva();interventoCorrente=null;});
   document.getElementById("abilita-audio").addEventListener("click",preparaAudio);
   document.getElementById("salva-scheda").addEventListener("click",salvaScheda);
-  document.getElementById("cambia-mezzo").addEventListener("click",()=>{localStorage.removeItem(STORAGE_KEY);if(socket)socket.disconnect();mezzoSelezionato=null;missioneCorrente=null;const url=new URL(location.href);url.searchParams.delete(MEZZO_QUERY_KEY);history.replaceState({},"",url.toString());vaiA("selezione");caricaMezzi();});
+  document.getElementById("cambia-mezzo").addEventListener("click",()=>{sessionStorage.removeItem(STORAGE_KEY);if(socket)socket.disconnect();mezzoSelezionato=null;missioneCorrente=null;interventoCorrente=null;sheet={};const url=new URL(location.href);url.searchParams.delete(MEZZO_QUERY_KEY);history.replaceState({},"",url.toString());vaiA("selezione");caricaMezzi();});
 
   async function avvio(){
-    if(mezzoDaLink){
-      try{
-        const r=await fetch(`${API_URL}/mezzi`);
-        const mezzi=await r.json();
-        const scelto=mezzi.find(m=>m.id===mezzoDaLink);
+    // Ogni scheda/dispositivo sceglie il proprio mezzo. Non usare localStorage
+    // e non auto-selezionare il mezzo dalla URL condivisa.
+    try{
+      const salvato=sessionStorage.getItem(STORAGE_KEY);
+      if(salvato){
+        const mezzo=JSON.parse(salvato);
+        const mezzi=await (await fetch(`${API_URL}/mezzi`)).json();
+        const scelto=mezzi.find(m=>m.id===mezzo.id);
         if(scelto){await selezionaMezzo(scelto);return;}
-      }catch{}
-    }
-    const salvato=localStorage.getItem(STORAGE_KEY);
-    if(salvato){try{selezionaMezzo(JSON.parse(salvato));return;}catch{}}
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    }catch{}
     vaiA("selezione");caricaMezzi();
   }
   avvio();

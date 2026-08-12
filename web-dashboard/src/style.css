@@ -34,3 +34,26 @@
 .workspace{grid-template-columns:var(--left-width,280px) 7px minmax(420px,1fr) 390px}
 @media(max-width:1100px){.workspace{grid-template-columns:var(--left-width,235px) 7px minmax(360px,1fr) 330px}}
 @media(max-width:850px){.workspace{grid-template-columns:1fr}.leftResizeHandle{display:none}}
+/* Brogliaccio completo CO */
+.brogliaccioFab{position:fixed;right:22px;bottom:22px;z-index:900;border:1px solid #1e293b;background:#0f172a;color:#fff;border-radius:999px;padding:11px 15px;font-weight:900;box-shadow:0 10px 28px #0004;display:flex;gap:8px;align-items:center}
+.brogliaccioFab:hover{background:#1e293b}
+.brogliaccioBack{align-items:stretch;padding:18px}
+.brogliaccioModal{width:min(1180px,100%);height:min(92vh,100%);display:flex;flex-direction:column;padding:20px;overflow:hidden}
+.brogliaccioHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;padding-right:30px;border-bottom:1px solid #e5eaf0;padding-bottom:12px}
+.brogliaccioHeader h2{margin:0 0 4px}
+.brogliaccioHeader small{color:#718096}
+.brogliaccioHeader button,.brogliaccioMissionHead button{border:1px solid #d6dee8;background:#fff;border-radius:8px;padding:8px 10px;font-weight:800}
+.brogliaccioList{overflow:auto;padding:14px 2px;display:grid;gap:12px}
+.brogliaccioMission{border:1px solid #dfe6ee;background:#fff;border-radius:12px;padding:12px}
+.brogliaccioMissionHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.brogliaccioMissionHead b{font-size:12px;display:block}
+.brogliaccioMissionHead strong{display:block;font-size:14px;margin:3px 0}
+.brogliaccioMissionHead small{color:#718096;font-size:10px}
+.brogliaccioTimes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin-bottom:10px}
+.brogliaccioTimes label{display:grid;gap:4px;font-size:9px;color:#657286;font-weight:800}
+.brogliaccioTimes input,.brogliaccioEvent input{width:100%;border:1px solid #d7dee8;background:#fbfcfe;border-radius:7px;padding:7px;font-size:10px}
+.brogliaccioEvents{border-top:1px solid #edf0f4;padding-top:6px;display:grid}
+.brogliaccioEvent{display:grid;grid-template-columns:175px minmax(150px,1fr) 130px 70px;gap:7px;align-items:center;padding:6px 0;border-bottom:1px solid #f0f2f5;font-size:10px}
+.brogliaccioEvent span{color:#718096}
+@media(max-width:900px){.brogliaccioTimes{grid-template-columns:1fr 1fr}.brogliaccioEvent{grid-template-columns:1fr 1fr}.brogliaccioFab span{display:none}}
+@media(max-width:600px){.brogliaccioModal{height:100%;border-radius:10px}.brogliaccioMissionHead{flex-direction:column}.brogliaccioTimes{grid-template-columns:1fr}.brogliaccioEvent{grid-template-columns:1fr}.brogliaccioFab{right:12px;bottom:12px}}
