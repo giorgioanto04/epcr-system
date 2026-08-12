@@ -174,3 +174,18 @@ CREATE TABLE IF NOT EXISTS punti_interesse (
   lon DOUBLE PRECISION NOT NULL,
   creato_il TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+
+-- IRIS v2: pazienti multipli per ogni missione (max emergenze / triage multi-vittima)
+CREATE TABLE IF NOT EXISTS pazienti_intervento (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  intervento_id UUID NOT NULL REFERENCES interventi(id) ON DELETE CASCADE,
+  numero INTEGER NOT NULL,
+  mezzo_id UUID REFERENCES mezzi(id) ON DELETE SET NULL,
+  etichetta TEXT,
+  scheda JSONB NOT NULL DEFAULT '{}'::jsonb,
+  creato_il TIMESTAMPTZ NOT NULL DEFAULT now(),
+  aggiornato_il TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(intervento_id, numero)
+);
+CREATE INDEX IF NOT EXISTS idx_pazienti_intervento_intervento ON pazienti_intervento(intervento_id, numero);

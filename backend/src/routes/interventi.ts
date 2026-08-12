@@ -6,6 +6,17 @@ import { inviaNotificaAttivazione } from "../ws/push.js";
 const TIMEOUT_SECONDI = Number(process.env.ACTIVATION_TIMEOUT_SECONDS ?? 60);
 const STATI_MISSIONE = ["attivazione","partenza","arrivo_sul_posto","paziente_visto","partenza_ospedale","arrivo_ospedale","libero_in_ospedale","rientro","disponibile"] as const;
 
+async function ensurePazienti(interventoId: string) {
+  const { rows } = await pool.query(`SELECT * FROM pazienti_intervento WHERE intervento_id=$1 ORDER BY numero`, [interventoId]);
+  if (!rows.length) {
+    const missione = await pool.query(`SELECT scheda FROM interventi WHERE id=$1`, [interventoId]);
+    const legacy = missione.rows[0]?.scheda || {};
+    await pool.query(`INSERT INTO pazienti_intervento(intervento_id,numero,scheda) VALUES($1,1,$2) ON CONFLICT DO NOTHING`, [interventoId, JSON.stringify(legacy)]);
+    return (await pool.query(`SELECT * FROM pazienti_intervento WHERE intervento_id=$1 ORDER BY numero`, [interventoId])).rows;
+  }
+  return rows;
+}
+
 async function missioneCompleta(id: string) {
   const { rows } = await pool.query(`
     SELECT i.*, COALESCE(json_agg(json_build_object(
@@ -19,6 +30,8 @@ async function missioneCompleta(id: string) {
     LEFT JOIN intervento_mezzi im ON im.intervento_id=i.id
     LEFT JOIN mezzi m ON m.id=im.mezzo_id
     WHERE i.id=$1 GROUP BY i.id`, [id]);
+  if (!rows[0]) return rows[0];
+  rows[0].pazienti = await ensurePazienti(id);
   return rows[0];
 }
 
@@ -91,6 +104,54 @@ export async function interventiRoutes(app: FastifyInstance) {
     const { id }=req.params as {id:string}; const { scheda, ospedale, priorita }=req.body as {scheda:Record<string,unknown>;ospedale?:string;priorita?:string};
     const { rows }=await pool.query(`UPDATE interventi SET scheda=$1, ospedale=COALESCE($2,ospedale), priorita=COALESCE($3,priorita) WHERE id=$4 RETURNING *`,[JSON.stringify(scheda||{}),ospedale??null,priorita??null,id]);
     if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"}); const m=await missioneCompleta(id); getIO().to("centrale").emit("missione_aggiornata",m); return m;
+  });
+
+  // Pazienti multipli per missione: ogni paziente ha una scheda indipendente.
+  app.get("/interventi/:id/pazienti", async (req, reply) => {
+    const { id } = req.params as { id:string };
+    const exists = await pool.query(`SELECT 1 FROM interventi WHERE id=$1`, [id]);
+    if (!exists.rows.length) return reply.code(404).send({ errore:"Missione non trovata" });
+    return ensurePazienti(id);
+  });
+
+  app.post("/interventi/:id/pazienti", async (req, reply) => {
+    const { id } = req.params as { id:string };
+    const { mezzoId, etichetta, scheda } = req.body as { mezzoId?:string; etichetta?:string; scheda?:Record<string,unknown> };
+    const exists = await pool.query(`SELECT 1 FROM interventi WHERE id=$1`, [id]);
+    if (!exists.rows.length) return reply.code(404).send({ errore:"Missione non trovata" });
+    const max = await pool.query(`SELECT COALESCE(MAX(numero),0)+1 AS numero FROM pazienti_intervento WHERE intervento_id=$1`, [id]);
+    const numero = Number(max.rows[0].numero);
+    if (mezzoId) {
+      const linked = await pool.query(`SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2`, [id, mezzoId]);
+      if (!linked.rows.length) return reply.code(409).send({ errore:"Il mezzo indicato non è assegnato alla missione" });
+    }
+    const { rows } = await pool.query(`INSERT INTO pazienti_intervento(intervento_id,numero,mezzo_id,etichetta,scheda) VALUES($1,$2,$3,$4,$5) RETURNING *`, [id,numero,mezzoId||null,etichetta||`Paziente ${numero}`,JSON.stringify(scheda||{})]);
+    const m=await missioneCompleta(id); getIO().to("centrale").emit("paziente_creato",m);
+    if (mezzoId) getIO().to(`mezzo:${mezzoId}`).emit("paziente_creato",m);
+    return reply.code(201).send(rows[0]);
+  });
+
+  app.patch("/interventi/:id/pazienti/:pazienteId", async (req, reply) => {
+    const { id,pazienteId } = req.params as {id:string;pazienteId:string};
+    const { mezzoId, etichetta, scheda } = req.body as { mezzoId?:string|null; etichetta?:string; scheda?:Record<string,unknown> };
+    if (mezzoId) {
+      const linked = await pool.query(`SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2`, [id,mezzoId]);
+      if (!linked.rows.length) return reply.code(409).send({ errore:"Il mezzo indicato non è assegnato alla missione" });
+    }
+    const { rows } = await pool.query(`UPDATE pazienti_intervento SET mezzo_id=$1, etichetta=COALESCE($2,etichetta), scheda=COALESCE($3,scheda), aggiornato_il=now() WHERE id=$4 AND intervento_id=$5 RETURNING *`, [mezzoId||null,etichetta??null,scheda?JSON.stringify(scheda):null,pazienteId,id]);
+    if (!rows.length) return reply.code(404).send({ errore:"Paziente non trovato" });
+    const m=await missioneCompleta(id); getIO().to("centrale").emit("paziente_aggiornato",m);
+    if (rows[0].mezzo_id) getIO().to(`mezzo:${rows[0].mezzo_id}`).emit("paziente_aggiornato",m);
+    return rows[0];
+  });
+
+  app.delete("/interventi/:id/pazienti/:pazienteId", async (req, reply) => {
+    const { id,pazienteId } = req.params as {id:string;pazienteId:string};
+    const { rows } = await pool.query(`DELETE FROM pazienti_intervento WHERE id=$1 AND intervento_id=$2 RETURNING *`, [pazienteId,id]);
+    if (!rows.length) return reply.code(404).send({ errore:"Paziente non trovato" });
+    await pool.query(`UPDATE pazienti_intervento SET numero=numero-1 WHERE intervento_id=$1 AND numero > $2`, [id,rows[0].numero]);
+    const m=await missioneCompleta(id); getIO().to("centrale").emit("paziente_eliminato",m);
+    return m;
   });
 
   app.delete("/interventi/:id", async (req, reply) => {
