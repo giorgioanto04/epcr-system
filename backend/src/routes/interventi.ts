@@ -71,11 +71,41 @@ export async function interventiRoutes(app: FastifyInstance) {
     if(!rows.length)return reply.code(404).send({errore:"Missione non trovata"}); getIO().to("centrale").emit("intervento_eliminato",{id}); return {ok:true};
   });
 
+  // Un mezzo può essere impegnato su una sola missione attiva per volta: è
+  // riassegnabile solo se libero (mai assegnato / fuori servizio non incluso),
+  // oppure se sulla missione attiva in cui si trova ha già raggiunto uno stato
+  // di "rientro", "libero in ospedale" o "disponibile".
+  async function mezzoAssegnabile(mezzoId: string) {
+    const attive = await pool.query(
+      `SELECT im.intervento_id
+       FROM intervento_mezzi im
+       JOIN interventi i ON i.id = im.intervento_id
+       WHERE im.mezzo_id=$1 AND i.stato NOT IN ('concluso','annullato')`,
+      [mezzoId]
+    );
+    for (const row of attive.rows) {
+      const ultimo = await pool.query(
+        `SELECT stato FROM stati_intervento WHERE intervento_id=$1 AND mezzo_id=$2 ORDER BY registrato_il DESC LIMIT 1`,
+        [row.intervento_id, mezzoId]
+      );
+      const statoAttuale = ultimo.rows[0]?.stato;
+      if (!["rientro", "libero_in_ospedale", "disponibile"].includes(statoAttuale)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   app.post("/interventi/:id/assegna", async (req, reply) => {
     const {id}=req.params as {id:string}; const {mezzoId,operatoreId}=req.body as {mezzoId:string;operatoreId?:string};
     if(!mezzoId)return reply.code(400).send({errore:"mezzoId obbligatorio"});
     const mezzo=await pool.query("SELECT * FROM mezzi WHERE id=$1",[mezzoId]); if(!mezzo.rows.length)return reply.code(404).send({errore:"Mezzo non trovato"});
+    if(mezzo.rows[0].stato==='fuori_servizio')return reply.code(409).send({errore:"Il mezzo è fuori servizio e non può essere assegnato"});
     const intervento=await pool.query("SELECT * FROM interventi WHERE id=$1",[id]); if(!intervento.rows.length)return reply.code(404).send({errore:"Missione non trovata"});
+    const giaAssegnato=await pool.query("SELECT 1 FROM intervento_mezzi WHERE intervento_id=$1 AND mezzo_id=$2",[id,mezzoId]);
+    if(!giaAssegnato.rows.length && !(await mezzoAssegnabile(mezzoId))) {
+      return reply.code(409).send({errore:"Il mezzo è già impegnato su un'altra missione: può essere riassegnato solo se in rientro, libero in ospedale o disponibile"});
+    }
     await pool.query(`INSERT INTO intervento_mezzi(intervento_id,mezzo_id) VALUES($1,$2) ON CONFLICT DO NOTHING`,[id,mezzoId]);
     await pool.query(`UPDATE interventi SET stato='assegnato',ora_assegnazione=COALESCE(ora_assegnazione,now()),mezzo_id=COALESCE(mezzo_id,$2) WHERE id=$1`,[id,mezzoId]);
     await pool.query("UPDATE mezzi SET stato='impegnato' WHERE id=$1",[mezzoId]);

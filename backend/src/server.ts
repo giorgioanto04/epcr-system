@@ -4,12 +4,14 @@ import cors from "@fastify/cors";
 import { setupSocket } from "./ws/socket.js";
 import { mezziRoutes } from "./routes/mezzi.js";
 import { interventiRoutes } from "./routes/interventi.js";
+import { poiRoutes } from "./routes/poi.js";
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
 app.get("/health", async () => ({ ok:true, service:"IRIS v2" }));
 await app.register(mezziRoutes);
 await app.register(interventiRoutes);
+await app.register(poiRoutes);
 setupSocket(app);
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host:"0.0.0.0" });

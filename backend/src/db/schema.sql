@@ -162,3 +162,15 @@ BEGIN
     ALTER TABLE notifiche_attivazione ADD CONSTRAINT notifiche_attivazione_intervento_id_fkey FOREIGN KEY (intervento_id) REFERENCES interventi(id) ON DELETE CASCADE;
   END IF;
 END $$;
+
+-- Punti di interesse sulla mappa operativa: squadre a piedi, punti di raccolta,
+-- posti di comando, o qualsiasi altro segnalino utile alla centrale.
+CREATE TABLE IF NOT EXISTS punti_interesse (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tipo TEXT NOT NULL DEFAULT 'altro' CHECK (tipo IN ('squadra','intervento','posto_comando','punto_raccolta','altro')),
+  etichetta TEXT NOT NULL,
+  note TEXT,
+  lat DOUBLE PRECISION NOT NULL,
+  lon DOUBLE PRECISION NOT NULL,
+  creato_il TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -7,13 +7,21 @@ const STATI = new Set(["disponibile", "impegnato", "fuori_servizio"]);
 export async function mezziRoutes(app: FastifyInstance) {
   app.get("/mezzi", async () => {
     const { rows } = await pool.query(`
-      SELECT m.*, i.missione_numero AS missione_numero, i.id AS intervento_id
+      SELECT m.*, i.missione_numero AS missione_numero, i.id AS intervento_id,
+        (SELECT s.stato FROM stati_intervento s
+          WHERE s.intervento_id = i.id AND s.mezzo_id = m.id
+          ORDER BY s.registrato_il DESC LIMIT 1) AS ultimo_stato
       FROM mezzi m
       LEFT JOIN intervento_mezzi im ON im.mezzo_id = m.id
       LEFT JOIN interventi i ON i.id = im.intervento_id AND i.stato NOT IN ('concluso','annullato')
       ORDER BY m.nome
     `);
-    return rows;
+    // Un mezzo è riassegnabile a una nuova missione solo se libero, oppure se
+    // sulla missione attiva corrente è già in rientro / libero in ospedale / disponibile.
+    return rows.map(r => ({
+      ...r,
+      assegnabile: !r.intervento_id || ["rientro", "libero_in_ospedale", "disponibile"].includes(r.ultimo_stato),
+    }));
   });
 
   app.post("/mezzi", async (req, reply) => {
